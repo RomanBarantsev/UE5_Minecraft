@@ -25,5 +25,5 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	UPROPERTY(EditAnywhere)
-	TSubclassOf<ACube> CubeClass;
+	UStaticMesh* CubeClass;
 };
