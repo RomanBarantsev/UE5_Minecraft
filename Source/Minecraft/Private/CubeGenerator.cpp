@@ -45,29 +45,26 @@ void ACubeGenerator::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	const int GridX = 500;
-	const int GridY = 500;
-	const float CubeSize = 100.0f;
-	const int CubeSpacing = 2;
 
 	UPerlinNoise3D* Noise = NewObject<UPerlinNoise3D>();
 
-	float Scale = 0.02f;         // Чем меньше, тем плавнее горы
-	int32 Octaves = 4;
-	float Persistence = 0.5f;
-	float Lacunarity = 2.0f;
-	int32 Seed = 1337;
-	const float BlockSize = 100.0f; // Размер кубика
-	int MaxHeight=100;
+	
 	for (int x = 0; x < GridX; x++)
 	{
 		for (int y = 0; y < GridY; y++)
 		{
-			float NoiseValue = Noise->Perlin3D(x, y, 0, Scale, Octaves, Persistence, Lacunarity, Seed);
-			int32 Height = FMath::Clamp(FMath::RoundToInt((NoiseValue + 1.0f) * 0.5f * MaxHeight), 0, MaxHeight);
-			FVector Location(x * CubeSize*CubeSpacing, y * CubeSize*CubeSpacing, Height*100);
-			FTransform Transform(Location);
-			HISM->AddInstance(Transform);
+			for (int z = 0; z < GridZ; ++z)
+			{
+				float density  = Noise->Perlin3D(x, y, z, Scale, Octaves, Persistence, Lacunarity, Seed);
+				if (density > Threshold)
+				{
+					FVector Location(x * CubeSize, y * CubeSize, z * CubeSize);
+					FTransform Transform(Location);
+					HISM->AddInstance(Transform);
+				}
+				
+			}
+			
 		}
 	}
 

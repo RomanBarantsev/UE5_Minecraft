@@ -19,6 +19,20 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	const int GridX = 100;
+	const int GridY = 100;
+	const int GridZ = 100;
+	const float CubeSize = 256.0f;
+	const int CubeSpacing = 0;
+	
+	float Scale = 0.02f;         // Чем меньше, тем плавнее горы
+	int32 Octaves = 4;
+	float Persistence = 0.5f;
+	float Lacunarity = 2.0f;
+	int32 Seed = 1337;
+	
+	int MaxHeight=100;	
+	float Threshold = 0.0f;  // порог плотности
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
