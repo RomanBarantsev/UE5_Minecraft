@@ -3,9 +3,26 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/PerlinNoise3D.h"
 #include "CubeGenerator.generated.h"
+
+class UDataTable;
+
+USTRUCT(BlueprintType)
+struct FPerlinNoiseBiom : public FTableRowBase
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
+	float Scale;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
+	float Octaves;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
+	float Persistence;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
+	float Lacunarity;
+};
 
 UCLASS()
 class MINECRAFT_API ACubeGenerator : public AActor
@@ -24,16 +41,15 @@ protected:
 	const int GridZ = 100;
 	const float CubeSize = 256.0f;
 	const int CubeSpacing = 0;
+	UPROPERTY(EditAnywhere)
+	int Seed=0;
+	UPROPERTY(EditAnywhere)
+	UDataTable* PerlinNoiseTable;	
 	
-	float Scale = 0.02f;         // Чем меньше, тем плавнее горы
-	int32 Octaves = 4;
-	float Persistence = 0.5f;
-	float Lacunarity = 2.0f;
-	int32 Seed = 1337;
-	
-	int MaxHeight=100;	
 	float Threshold = 0.0f;  // порог плотности
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	void Generation2D();
+	void Generation3D();	
 };

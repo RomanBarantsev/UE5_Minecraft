@@ -12,7 +12,16 @@
 ACubeGenerator::ACubeGenerator()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
+	static ConstructorHelpers::FObjectFinder<UDataTable> DataTableRef(TEXT("DataTable'/Game/PerlinNoiseDataTable.PerlinNoiseDataTable'"));
+	if (DataTableRef.Succeeded())
+	{
+		PerlinNoiseTable = DataTableRef.Object;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to load DataTable: /Game/PerlinNoiseDataTable.PerlinNoiseDataTable"));
+	}
+	
 	// Создаём корневой компонент
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
@@ -46,8 +55,50 @@ void ACubeGenerator::BeginPlay()
 	Super::BeginPlay();
 	
 
-	UPerlinNoise3D* Noise = NewObject<UPerlinNoise3D>();
+	
+}
 
+// Called every frame
+void ACubeGenerator::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+}
+
+void ACubeGenerator::Generation2D()
+{
+	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Default","name");
+	int Scale;
+	int Octaves;
+	int Persistence;
+	int Lacunarity;
+	if (Row)
+	{
+		Scale = Row->Scale;
+		Octaves = Row->Octaves;
+		Persistence = Row->Persistence;
+		Lacunarity = Row->Lacunarity;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Data table FPerlinNoiseBiom read error"));
+		return;
+	}
+	UPerlinNoise2D* Noise = NewObject<UPerlinNoise2D>();
+	for (int x = 0; x < GridX; x++)
+	{
+		for (int y = 0; y < GridY; y++)
+		{
+			float highs  = Noise->Perlin2D(x, y, Scale, Octaves, Persistence, Lacunarity, Seed);
+			FVector Location(x * CubeSize, y * CubeSize, highs * CubeSize);
+			FTransform Transform(Location);
+			HISM->AddInstance(Transform);		
+		}
+	}
+}
+
+void ACubeGenerator::Generation3D()
+{
+	UPerlinNoise3D* Noise = NewObject<UPerlinNoise3D>();
 	
 	for (int x = 0; x < GridX; x++)
 	{
@@ -67,13 +118,6 @@ void ACubeGenerator::BeginPlay()
 			
 		}
 	}
-
 	UE_LOG(LogTemp, Display, TEXT("✅ Сгенерировано %d кубов"), GridX * GridY);
-}
-
-// Called every frame
-void ACubeGenerator::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
 }
 
