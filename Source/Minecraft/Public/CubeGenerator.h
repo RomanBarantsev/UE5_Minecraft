@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Chaos/Vector.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/PerlinNoise3D.h"
@@ -41,15 +42,23 @@ protected:
 	const int GridZ = 100;
 	const float CubeSize = 256.0f;
 	const int CubeSpacing = 0;
+
+	float Scale;
+	float Octaves;
+	float Persistence;
+	float Lacunarity;	
 	UPROPERTY(EditAnywhere)
-	int Seed=0;
+	int Seed=1343;	
 	UPROPERTY(EditAnywhere)
-	UDataTable* PerlinNoiseTable;	
+	UDataTable* PerlinNoiseTable;
 	
-	float Threshold = 0.0f;  // порог плотности
+	
+	float Threshold = 0.1f;  // порог плотности
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void Generation2D();
-	void Generation3D();	
+	void Generation3D();
+	void LoadNoiseTemplate(FName name);
+	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
 };
