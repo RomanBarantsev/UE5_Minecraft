@@ -6,6 +6,7 @@
 #include "Chaos/Vector.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
+#include "Minecraft/Chunk.h"
 #include "Minecraft/PerlinNoise3D.h"
 #include "CubeGenerator.generated.h"
 
@@ -30,19 +31,20 @@ class MINECRAFT_API ACubeGenerator : public AActor
 {
 	GENERATED_BODY()
 	UPROPERTY()
-	UHierarchicalInstancedStaticMeshComponent* HISM;
+	UInstancedStaticMeshComponent* HISM;
 public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	const int GridX = 100;
-	const int GridY = 100;
-	const int GridZ = 100;
+	const int UpperLayer3d=100;
 	const float CubeSize = 256.0f;
 	const int CubeSpacing = 0;
-
+	UPROPERTY()
+	UPerlinNoise2D* Noise2D;
+	UPROPERTY()
+	UPerlinNoise3D* Noise3D;
 	float Scale;
 	float Octaves;
 	float Persistence;
@@ -51,14 +53,16 @@ protected:
 	int Seed=1343;	
 	UPROPERTY(EditAnywhere)
 	UDataTable* PerlinNoiseTable;
-	
-	
+	UPROPERTY()
+	UChunk* NewChunk;	
 	float Threshold = 0.1f;  // порог плотности
-public:
+private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void Generation2D();
 	void Generation3D();
+	int mapHeight(double h);
 	void LoadNoiseTemplate(FName name);
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
+	void DrawCall() const;
 };
