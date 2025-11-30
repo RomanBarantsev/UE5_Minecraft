@@ -56,6 +56,8 @@ protected:
 	UPROPERTY()
 	UChunk* NewChunk;	
 	float Threshold = 0.1f;  // порог плотности
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
+	UMaterialInterface* Mat;
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
