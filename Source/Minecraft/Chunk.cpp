@@ -9,6 +9,9 @@ void UChunk::InitChunk()
 	std::vector<std::vector<BlockType>> y(_yMax,z);
 	std::vector<std::vector<std::vector<BlockType>>> x(_xMax,y);
 	Terrain = x;
+	std::vector<int> SurfX(_xMax, 0);
+	std::vector<std::vector<int>> SurfY(_yMax,SurfX);
+	Surface = SurfY;
 	std::vector<char16_t> zFloor(_zMax, 0);
 	std::vector<std::vector<char16_t>> yFloor(_yMax,zFloor);
 }

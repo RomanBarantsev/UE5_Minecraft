@@ -7,14 +7,14 @@
 
 enum BlockType
 {
-	Empty=0,
-	Stone=1,
+	Empty=-1,
+	Stone=2,
 	Dirt=2,
-	Grass=3,
+	Grass=9,
 };
 
-constexpr int CHUNK_SIZE = 32;
-constexpr int CHUNK_Z = 128;
+constexpr int CHUNK_SIZE = 512;
+constexpr int CHUNK_Z = 512;
 constexpr int MIN_HEIGHT = 20;
 constexpr int MAX_HEIGHT = 96;
 constexpr int WATER_LEVEL = 62;
@@ -23,12 +23,12 @@ UCLASS()
 class MINECRAFT_API UChunk : public UObject
 {
 	GENERATED_BODY()
-private:
+public:
 	int _xMax;
 	int _yMax;
 	int _zMax;
 	std::vector<std::vector<std::vector<BlockType>>> Terrain;
-public:
+	std::vector<std::vector<int>> Surface;
 	void InitChunk();
 	void SetBlock(int x,int y,int z,BlockType type);
 	void Fill();
