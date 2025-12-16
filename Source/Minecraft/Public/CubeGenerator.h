@@ -38,17 +38,25 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	const int UpperLayer3d=100;
 	const float CubeSize = 256.0f;
 	const int CubeSpacing = 0;
 	UPROPERTY()
-	UPerlinNoise2D* Noise2D;
+	UPerlinNoise2D* Surface;
 	UPROPERTY()
-	UPerlinNoise3D* Noise3D;
+	UPerlinNoise2D* Continentalness;
+	UPROPERTY()
+	UPerlinNoise2D* Errosion;		
+	UPROPERTY(EditAnywhere)
+	UCurveFloat* ContinentalnessCurve;
 	float Scale;
 	float Octaves;
 	float Persistence;
-	float Lacunarity;	
+	float Lacunarity;
+	float ContScale;
+	float ContOctaves;
+	float ContPersistence;
+	float ContLacunarity;
+	
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	
 	UPROPERTY(EditAnywhere)
@@ -61,10 +69,12 @@ protected:
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	void Generation2D();
-	void Generation3D();
-	int mapHeight(double h);
-	void LoadNoiseTemplate(FName name);
+	UFUNCTION()
+	void GenerateSurface();
+	UFUNCTION()
+	void Generation3D();	
+	int mapHeight(double n,int x,int y);
+	void LoadNoiseTemplate();
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
 	void DrawCall() const;
 };

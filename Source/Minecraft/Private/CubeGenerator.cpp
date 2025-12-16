@@ -53,7 +53,6 @@ ACubeGenerator::ACubeGenerator()
 void ACubeGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-	// Устанавливаем оптимальные параметры
 	HISM->NumCustomDataFloats = 2;
 	HISM->bCastDynamicShadow = true;
 	HISM->bAffectDistanceFieldLighting = false;
@@ -61,16 +60,17 @@ void ACubeGenerator::BeginPlay()
 	{
 		HISM->SetMaterial(0,Mat);
 	}
-	Noise2D = NewObject<UPerlinNoise2D>();
-	Noise3D = NewObject<UPerlinNoise3D>();
+	Surface = NewObject<UPerlinNoise2D>();
+	Continentalness = NewObject<UPerlinNoise2D>();
 	//time start
-	LoadNoiseTemplate("Default");
+	LoadNoiseTemplate();
 	NewChunk = NewObject<UChunk>();
 	NewChunk->InitChunk();
-	Generation2D();
-	LoadNoiseTemplate("Cave");
+	GenerateSurface();
+	LoadNoiseTemplate();
 	//Generation3D();
 	DrawCall();
+	//NewChunk->Fill();
 	//time end
 }
 
@@ -80,14 +80,14 @@ void ACubeGenerator::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void ACubeGenerator::Generation2D()
+void ACubeGenerator::GenerateSurface()
 {
 	for (int x = 0; x < CHUNK_SIZE; x++)
 	{
 		for (int y = 0; y < CHUNK_SIZE; y++)
 		{
-			NewChunk->Surface[x][y]  = mapHeight((Noise2D->Perlin2D(x, y,Scale,Octaves,Persistence,Lacunarity)));
-			NewChunk->SetBlock(x,y,NewChunk->Surface[x][y],BlockType::Stone);
+			NewChunk->Surface[x][y]  = mapHeight((Surface->Perlin2D(x, y,Scale,Octaves,Persistence,Lacunarity)),x,y);
+			NewChunk->SetBlock(x,y,NewChunk->Surface[x][y],BlockType::Stone);			
 		}
 	}
 }
@@ -106,34 +106,45 @@ void ACubeGenerator::Generation3D()
 				int depth = surf - z;
 				double heightInfluence = (z - depth) / 16.0;
 				double density = noise - heightInfluence;*/
-				float noise  = Noise3D->Perlin3D(x, y, z, Scale, Octaves, Persistence, Lacunarity, Seed);
-				int normalized = NormalizeNoise(noise,z,0,NewChunk->Surface[x][y],Threshold);
-				if (normalized > 0)
+				//float noise  = Noise3D->Perlin3D(x, y, z, Scale, Octaves, Persistence, Lacunarity, Seed);
+				//int normalized = NormalizeNoise(noise,z,0,NewChunk->Surface[x][y],Threshold);
+				/*if (normalized > 0)
 				{
 					NewChunk->SetBlock(x,y,z,BlockType::Stone);				
 				}
 				else
 				{
 					NewChunk->SetBlock(x,y,z,BlockType::Empty);
-				}
+				}*/
 			}
 		}
 	}
 	UE_LOG(LogTemp, Display, TEXT("✅ Сгенерировано %d кубов"), CHUNK_SIZE * CHUNK_SIZE);
 }
 
-int ACubeGenerator::mapHeight(double n)
+int ACubeGenerator::mapHeight(double n,int x,int y)
 {
 	double norm = (n + 1.0) * 0.5;
 	int h = (int)floor(MIN_HEIGHT + norm * (MAX_HEIGHT - MIN_HEIGHT));
 	if (h < 1) h = 1;
 	if (h >= CHUNK_Z-1) h = CHUNK_Z-2;
-	return h;
+	float cont = Continentalness->Perlin2D( x, y,ContScale,ContOctaves,ContPersistence,ContLacunarity);
+	cont=(cont+1.0f)/2;
+	int contH=0;
+	float Y=0;
+	if (ContinentalnessCurve)
+	{
+		Y = ContinentalnessCurve->GetFloatValue(cont);
+	}
+	contH=static_cast<int>(Y);
+	int finalHeight = (int)(h + contH);
+	finalHeight = FMath::Clamp(finalHeight, 1, CHUNK_Z - 2);
+	return finalHeight;
 }
 
-void ACubeGenerator::LoadNoiseTemplate(FName name)
+void ACubeGenerator::LoadNoiseTemplate()
 {
-	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>(name,"name");	
+	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Surface","name");	
 	if (Row)
 	{
 		Scale = Row->Scale;
@@ -141,10 +152,13 @@ void ACubeGenerator::LoadNoiseTemplate(FName name)
 		Persistence = Row->Persistence;
 		Lacunarity = Row->Lacunarity;
 	}
-	else
+	Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Surface","name");	
+	if (Row)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Data table FPerlinNoiseBiom read error"));
-		return;
+		ContScale = Row->Scale;
+		ContOctaves = Row->Octaves;
+		ContPersistence = Row->Persistence;
+		ContLacunarity = Row->Lacunarity;
 	}
 }
 
@@ -177,6 +191,7 @@ void ACubeGenerator::DrawCall() const
 					FVector Location(x * CubeSize, y * CubeSize, z * CubeSize);
 					FTransform Transform(Location);
 					int32 InstID = HISM->AddInstance(Transform);
+					//HISM->SetCustomDataValue(InstID,1,FMath::RandRange(0,16),true);
 					HISM->SetCustomDataValue(InstID,1,terrain[x][y][z],true);
 				}				
 			}
