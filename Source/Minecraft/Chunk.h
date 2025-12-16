@@ -13,7 +13,7 @@ enum BlockType
 	Grass=9,
 };
 
-constexpr int CHUNK_SIZE = 512;
+constexpr int CHUNK_SIZE = 256;
 constexpr int CHUNK_Z = 512;
 constexpr int MIN_HEIGHT = 20;
 constexpr int MAX_HEIGHT = 96;
@@ -24,9 +24,6 @@ class MINECRAFT_API UChunk : public UObject
 {
 	GENERATED_BODY()
 public:
-	int _xMax;
-	int _yMax;
-	int _zMax;
 	std::vector<std::vector<std::vector<BlockType>>> Terrain;
 	std::vector<std::vector<int>> Surface;
 	void InitChunk();
