@@ -31,7 +31,7 @@ class MINECRAFT_API ACubeGenerator : public AActor
 {
 	GENERATED_BODY()
 	UPROPERTY()
-	UInstancedStaticMeshComponent* HISM;
+	UHierarchicalInstancedStaticMeshComponent* HISM;
 public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();

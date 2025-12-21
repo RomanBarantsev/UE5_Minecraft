@@ -11,10 +11,11 @@ enum BlockType
 	Stone=2,
 	Dirt=2,
 	Grass=9,
+	Air=0
 };
 
-constexpr int CHUNK_SIZE = 256;
-constexpr int CHUNK_Z = 512;
+constexpr int CHUNK_SIZE = 64;
+constexpr int CHUNK_Z = 256;
 constexpr int MIN_HEIGHT = 20;
 constexpr int MAX_HEIGHT = 96;
 constexpr int WATER_LEVEL = 62;

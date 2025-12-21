@@ -1,5 +1,7 @@
 ﻿#include "Chunk.h"
 
+#include "DSP/AudioDebuggingUtilities.h"
+
 void UChunk::InitChunk()
 {
 	std::vector<BlockType> z(CHUNK_Z, BlockType::Empty);
@@ -24,15 +26,15 @@ void UChunk::Fill()
 	{
 		for (int y = 0; y < CHUNK_SIZE; y++)
 		{
-			for (int z = 0; z < CHUNK_SIZE; z++)
+			for (int z = 0; z < CHUNK_Z; z++)
 			{
+				if (z>Surface[x][y])
+				{
+					Terrain[x][y][z] = BlockType::Air;
+				}
 				if (Terrain[x][y][z] == BlockType::Empty)
 				{
 					Terrain[x][y][z] = BlockType::Stone;
-				}
-				else
-				{
-					z=MAX_HEIGHT;
 				}
 			}
 		}

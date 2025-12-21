@@ -3,6 +3,9 @@
 
 #include "CubeGenerator.h"
 
+#include "GreedyMeshing.h"
+#include "MovieSceneTracksComponentTypes.h"
+#include "ProceduralMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "DSP/Osc.h"
@@ -11,6 +14,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 
 
+class UProceduralMeshComponent;
 // Sets default values
 ACubeGenerator::ACubeGenerator()
 {
@@ -67,10 +71,16 @@ void ACubeGenerator::BeginPlay()
 	NewChunk = NewObject<UChunk>();
 	NewChunk->InitChunk();
 	GenerateSurface();
-	LoadNoiseTemplate();
-	//Generation3D();
-	DrawCall();
-	//NewChunk->Fill();
+	NewChunk->Fill();
+	//DrawCall();
+	UProceduralMeshComponent* ProcMesh;
+	ProcMesh = NewObject<UProceduralMeshComponent>(this);
+	ProcMesh->RegisterComponent();
+	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
+	ProcMesh->SetCollisionEnabled(ECollisionEnabled::Type::QueryAndPhysics);	
+	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();	
+	GM->BuildChunkMesh(NewChunk->GetTerrain());
+	GM->CreateMesh(*ProcMesh);
 	//time end
 }
 
@@ -179,7 +189,8 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 
 void ACubeGenerator::DrawCall() const
 {
-	auto terrain = NewChunk->GetTerrain();
+	const auto& terrain = NewChunk->GetTerrain();
+	HISM->PreAllocateInstancesMemory(CHUNK_SIZE*CHUNK_SIZE*CHUNK_Z);
 	for (int x = 0; x < CHUNK_SIZE; x++)
 	{
 		for (int y = 0; y < CHUNK_SIZE; y++)
@@ -191,11 +202,12 @@ void ACubeGenerator::DrawCall() const
 					FVector Location(x * CubeSize, y * CubeSize, z * CubeSize);
 					FTransform Transform(Location);
 					int32 InstID = HISM->AddInstance(Transform);
-					//HISM->SetCustomDataValue(InstID,1,FMath::RandRange(0,16),true);
-					HISM->SetCustomDataValue(InstID,1,terrain[x][y][z],true);
+					//HISM->SetCustomDataValue(InstID,1,FMath::RandRange(0,16),false);
+					//HISM->SetCustomDataValue(InstID,1,terrain[x][y][z],false);
 				}				
 			}
 		}
 	}
+	HISM->MarkRenderStateDirty();
 }
 
