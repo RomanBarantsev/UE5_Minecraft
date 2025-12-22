@@ -15,22 +15,35 @@ enum class EFace
 	PosX,NegX,PosY,NegY,PosZ,NegZ
 };
 
-CONSTEXPR int BLOCK_SIZE = 1000;
+struct FMaskCell
+{
+	bool bVisible;
+	BlockType Type;
+	bool bBackFace;
+};
+
+constexpr int MAX_DIM = FMath::Max(CHUNK_SIZE, CHUNK_Z);
+
+constexpr int ATLAS_SIZE = 4;          // 4x4
+constexpr float TILE = 1.0f / 4.0f;    // 0.25
 /**
  * 
  */
 UCLASS()
 class MINECRAFT_API UGreedyMeshing : public UObject
 {
+	GENERATED_BODY()
 private:
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
 	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
-	void AddFace(const FVector& BlockPos,EFace Face);
+	void AddFace(const FVector& BlockPos, EFace Face, BlockType Type);
+	FVector4 GetBlockUV(BlockType Type);
+	FIntPoint AtlasFromIndex(int Index);
+	void AddAtlasUVs(int TextureIndex);
 public:
 	void BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
-	void CreateMesh(UProceduralMeshComponent& procMesh);
-	GENERATED_BODY()
+	void CreateMesh(UProceduralMeshComponent& procMesh,UMaterialInterface* Mat);
 };

@@ -8,10 +8,10 @@
 enum BlockType
 {
 	Empty=-1,
-	Stone=2,
-	Dirt=2,
-	Grass=9,
-	Air=0
+	Air   = 0,
+	Grass = 1,
+	Dirt  = 2,
+	Stone = 3
 };
 
 constexpr int CHUNK_SIZE = 64;

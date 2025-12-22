@@ -11,6 +11,7 @@
 #include "CubeGenerator.generated.h"
 
 class UDataTable;
+CONSTEXPR int BLOCK_SIZE = 256.0f;
 
 USTRUCT(BlueprintType)
 struct FPerlinNoiseBiom : public FTableRowBase
@@ -38,7 +39,6 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	const float CubeSize = 256.0f;
 	const int CubeSpacing = 0;
 	UPROPERTY()
 	UPerlinNoise2D* Surface;
@@ -69,10 +69,7 @@ protected:
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	UFUNCTION()
 	void GenerateSurface();
-	UFUNCTION()
-	void Generation3D();	
 	int mapHeight(double n,int x,int y);
 	void LoadNoiseTemplate();
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);

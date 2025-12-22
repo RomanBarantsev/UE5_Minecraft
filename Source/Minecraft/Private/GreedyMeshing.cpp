@@ -3,6 +3,7 @@
 
 #include "GreedyMeshing.h"
 
+#include "CubeGenerator.h"
 #include "ProceduralMeshComponent.h"
 
 
@@ -13,7 +14,7 @@ bool UGreedyMeshing::IsAir(int x, int y, int z, const std::vector<std::vector<st
 	return Blocks[x][y][z] == BlockType::Air;
 }
 
-void UGreedyMeshing::AddFace(const FVector& BlockPos, EFace Face)
+void UGreedyMeshing::AddFace(const FVector& BlockPos, EFace Face, BlockType Type)
 {
 	int StartIndex = Vertices.Num();
 	FVector v0, v1, v2, v3;
@@ -66,7 +67,6 @@ void UGreedyMeshing::AddFace(const FVector& BlockPos, EFace Face)
 		return;
 	}
 	Vertices.Append({ v0, v1, v2, v3 });
-
 	Triangles.Append({
 		StartIndex + 0, StartIndex + 1, StartIndex + 2,
 		StartIndex + 0, StartIndex + 2, StartIndex + 3
@@ -74,12 +74,13 @@ void UGreedyMeshing::AddFace(const FVector& BlockPos, EFace Face)
 
 	for (int i = 0; i < 4; i++)
 		Normals.Add(normal);
-
+	
+	FVector4 UV = GetBlockUV(Type);
 	UVs.Append({
-		FVector2D(0,0),
-		FVector2D(1,0),
-		FVector2D(1,1),
-		FVector2D(0,1)
+	FVector2D(UV.X,          UV.Y),
+	FVector2D(UV.X + UV.Z,   UV.Y),
+	FVector2D(UV.X + UV.Z,   UV.Y + UV.W),
+	FVector2D(UV.X,          UV.Y + UV.W)
 	});
 }
 
@@ -97,17 +98,53 @@ void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<Bl
 					y * BLOCK_SIZE,
 					z * BLOCK_SIZE
 				);
-
-				if (IsAir(x + 1, y, z, Blocks)) AddFace(BlockPos, EFace::PosX);
-				if (IsAir(x - 1, y, z, Blocks)) AddFace(BlockPos, EFace::NegX);
-				if (IsAir(x, y + 1, z, Blocks)) AddFace(BlockPos, EFace::PosY);
-				if (IsAir(x, y - 1, z, Blocks)) AddFace(BlockPos, EFace::NegY);
-				if (IsAir(x, y, z + 1, Blocks)) AddFace(BlockPos, EFace::PosZ);
-				if (IsAir(x, y, z - 1, Blocks)) AddFace(BlockPos, EFace::NegZ);
+				BlockType type = Blocks[x][y][z];
+				if (IsAir(x + 1, y, z, Blocks)) AddFace(BlockPos, EFace::PosX,type);
+				if (IsAir(x - 1, y, z, Blocks)) AddFace(BlockPos, EFace::NegX,type);
+				if (IsAir(x, y + 1, z, Blocks)) AddFace(BlockPos, EFace::PosY,type);
+				if (IsAir(x, y - 1, z, Blocks)) AddFace(BlockPos, EFace::NegY,type);
+				if (IsAir(x, y, z + 1, Blocks)) AddFace(BlockPos, EFace::PosZ,type);
+				if (IsAir(x, y, z - 1, Blocks)) AddFace(BlockPos, EFace::NegZ,type);
 			}
 }
+void UGreedyMeshing::AddAtlasUVs(int TextureIndex)
+{
+	FIntPoint tile = AtlasFromIndex(TextureIndex);
 
-void UGreedyMeshing::CreateMesh(UProceduralMeshComponent& procMesh)
+	float U0 = tile.X * TILE;
+	float V0 = tile.Y * TILE;
+	float U1 = U0 + TILE;
+	float V1 = V0 + TILE;
+
+	UVs.Append({
+		FVector2D(U0, V0),
+		FVector2D(U1, V0),
+		FVector2D(U1, V1),
+		FVector2D(U0, V1)
+	});
+}
+
+FIntPoint UGreedyMeshing::AtlasFromIndex(int Index)
+{
+	int x = Index % ATLAS_SIZE;
+	int y = Index / ATLAS_SIZE;
+	return { x, y };
+}
+
+FVector4 UGreedyMeshing::GetBlockUV(BlockType Type)
+{
+	constexpr float T = 0.25;
+
+	switch (Type)
+	{
+	case BlockType::Grass: return FVector4(0*T, 0*T, T, T);
+	case BlockType::Dirt:  return FVector4(1*T, 0*T, T, T);
+	case BlockType::Stone: return FVector4(2*T, 0*T, T, T);
+	default:               return FVector4(0,   0,   T, T);
+	}
+}
+
+void UGreedyMeshing::CreateMesh(UProceduralMeshComponent& procMesh,UMaterialInterface* Mat)
 {
 	procMesh.CreateMeshSection(
 	0,
@@ -119,4 +156,6 @@ void UGreedyMeshing::CreateMesh(UProceduralMeshComponent& procMesh)
 	TArray<FProcMeshTangent>(),
 	true
 );
+	procMesh.SetMaterial(0, Mat);
 }
+

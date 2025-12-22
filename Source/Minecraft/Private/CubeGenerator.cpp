@@ -80,7 +80,8 @@ void ACubeGenerator::BeginPlay()
 	ProcMesh->SetCollisionEnabled(ECollisionEnabled::Type::QueryAndPhysics);	
 	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();	
 	GM->BuildChunkMesh(NewChunk->GetTerrain());
-	GM->CreateMesh(*ProcMesh);
+	//GM->BuildGreedyMesh(NewChunk->GetTerrain());
+	GM->CreateMesh(*ProcMesh,Mat);
 	//time end
 }
 
@@ -102,35 +103,6 @@ void ACubeGenerator::GenerateSurface()
 	}
 }
 
-void ACubeGenerator::Generation3D()
-{
-	auto terrain =  NewChunk->GetTerrain();
-	for (int x = 0; x < CHUNK_SIZE; x++)
-	{
-		for (int y = 0; y < CHUNK_SIZE; y++)
-		{			
-			for (int z = 0; z < NewChunk->Surface[x][y]; ++z)
-			{
-				/*int surf = NewChunk->Surface[x][y];
-				
-				int depth = surf - z;
-				double heightInfluence = (z - depth) / 16.0;
-				double density = noise - heightInfluence;*/
-				//float noise  = Noise3D->Perlin3D(x, y, z, Scale, Octaves, Persistence, Lacunarity, Seed);
-				//int normalized = NormalizeNoise(noise,z,0,NewChunk->Surface[x][y],Threshold);
-				/*if (normalized > 0)
-				{
-					NewChunk->SetBlock(x,y,z,BlockType::Stone);				
-				}
-				else
-				{
-					NewChunk->SetBlock(x,y,z,BlockType::Empty);
-				}*/
-			}
-		}
-	}
-	UE_LOG(LogTemp, Display, TEXT("✅ Сгенерировано %d кубов"), CHUNK_SIZE * CHUNK_SIZE);
-}
 
 int ACubeGenerator::mapHeight(double n,int x,int y)
 {
@@ -199,11 +171,11 @@ void ACubeGenerator::DrawCall() const
 			{
 				if (terrain[x][y][z]!=-1)
 				{
-					FVector Location(x * CubeSize, y * CubeSize, z * CubeSize);
+					FVector Location(x * BLOCK_SIZE, y * BLOCK_SIZE, z * BLOCK_SIZE);
 					FTransform Transform(Location);
 					int32 InstID = HISM->AddInstance(Transform);
 					//HISM->SetCustomDataValue(InstID,1,FMath::RandRange(0,16),false);
-					//HISM->SetCustomDataValue(InstID,1,terrain[x][y][z],false);
+					HISM->SetCustomDataValue(InstID,1,terrain[x][y][z],false);
 				}				
 			}
 		}
