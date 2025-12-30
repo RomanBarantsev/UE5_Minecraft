@@ -4,14 +4,7 @@
 #include "CubeGenerator.h"
 
 #include "GreedyMeshing.h"
-#include "MovieSceneTracksComponentTypes.h"
-#include "ProceduralMeshComponent.h"
-#include "Components/HierarchicalInstancedStaticMeshComponent.h"
-#include "Components/InstancedStaticMeshComponent.h"
-#include "DSP/Osc.h"
-#include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
-#include "Kismet/KismetSystemLibrary.h"
+#include "Minecraft/MinecraftProceduralMeshComponent.h"
 
 
 class UProceduralMeshComponent;
@@ -27,61 +20,22 @@ ACubeGenerator::ACubeGenerator()
 	else
 	{
 		UE_LOG(LogTemp, Error, TEXT("Failed to load DataTable: /Game/PerlinNoiseDataTable.PerlinNoiseDataTable"));
-	}
-	
+	}	
 	// Создаём корневой компонент
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-	// Создаём HISM-компонент (лучше, чем обычный ISM, т.к. поддерживает LOD и culling)
-	HISM = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CubeHISM"));
-	HISM->SetupAttachment(RootComponent);	
-	// Загружаем меш через ConstructorHelpers — это безопасно и быстро в конструкторе
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Game/Cube_2.Cube_2"));
-	if (CubeMesh.Succeeded())
-	{
-		HISM->SetStaticMesh(CubeMesh.Object);
-		HISM->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		HISM->SetMobility(EComponentMobility::Movable);
-		HISM->NumCustomDataFloats = 1;
-		
-		UE_LOG(LogTemp, Display, TEXT("✅ Cube mesh успешно загружен"));
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("❌ Не удалось загрузить StaticMesh: /Game/Cube_2.Cube_2"));
-	}	
 	
 }
 
 // Called when the game starts or when spawned
 void ACubeGenerator::BeginPlay()
 {
-	Super::BeginPlay();
-	HISM->NumCustomDataFloats = 2;
-	HISM->bCastDynamicShadow = true;
-	HISM->bAffectDistanceFieldLighting = false;
-	if (Mat)
-	{
-		HISM->SetMaterial(0,Mat);
-	}
+	Super::BeginPlay();	
 	Surface = NewObject<UPerlinNoise2D>();
 	Continentalness = NewObject<UPerlinNoise2D>();
 	//time start
 	LoadNoiseTemplate();
-	NewChunk = NewObject<UChunk>();
-	NewChunk->InitChunk();
-	GenerateSurface();
-	NewChunk->Fill();
-	//DrawCall();
-	UProceduralMeshComponent* ProcMesh;
-	ProcMesh = NewObject<UProceduralMeshComponent>(this);
-	ProcMesh->RegisterComponent();
-	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
-	ProcMesh->SetCollisionEnabled(ECollisionEnabled::Type::QueryAndPhysics);	
-	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();	
-	GM->BuildChunkMesh(NewChunk->GetTerrain());
-	//GM->BuildGreedyMesh(NewChunk->GetTerrain());
-	GM->CreateMesh(*ProcMesh,Mat);
+	ChunksInit();
 	//time end
 }
 
@@ -91,23 +45,10 @@ void ACubeGenerator::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void ACubeGenerator::GenerateSurface()
-{
-	for (int x = 0; x < CHUNK_SIZE; x++)
-	{
-		for (int y = 0; y < CHUNK_SIZE; y++)
-		{
-			NewChunk->Surface[x][y]  = mapHeight((Surface->Perlin2D(x, y,Scale,Octaves,Persistence,Lacunarity)),x,y);
-			NewChunk->SetBlock(x,y,NewChunk->Surface[x][y],BlockType::Stone);			
-		}
-	}
-}
-
-
 int ACubeGenerator::mapHeight(double n,int x,int y)
 {
 	double norm = (n + 1.0) * 0.5;
-	int h = (int)floor(MIN_HEIGHT + norm * (MAX_HEIGHT - MIN_HEIGHT));
+	int h = FMath::FloorToInt(floor(MIN_HEIGHT + norm * (MAX_HEIGHT - MIN_HEIGHT)));
 	if (h < 1) h = 1;
 	if (h >= CHUNK_Z-1) h = CHUNK_Z-2;
 	float cont = Continentalness->Perlin2D( x, y,ContScale,ContOctaves,ContPersistence,ContLacunarity);
@@ -134,7 +75,7 @@ void ACubeGenerator::LoadNoiseTemplate()
 		Persistence = Row->Persistence;
 		Lacunarity = Row->Lacunarity;
 	}
-	Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Surface","name");	
+	Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Continentalness","name");	
 	if (Row)
 	{
 		ContScale = Row->Scale;
@@ -159,27 +100,48 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 	return (density > threshold) ? 1 : 0;
 }
 
-void ACubeGenerator::DrawCall() const
-{
-	const auto& terrain = NewChunk->GetTerrain();
-	HISM->PreAllocateInstancesMemory(CHUNK_SIZE*CHUNK_SIZE*CHUNK_Z);
-	for (int x = 0; x < CHUNK_SIZE; x++)
+void ACubeGenerator::ChunksInit()
+{	
+	 
+	for (int x = 0; x < 10; x++)
 	{
-		for (int y = 0; y < CHUNK_SIZE; y++)
+		for (int y = 0; y < 10; y++)
 		{
-			for (int z = 0; z < CHUNK_Z; z++)
-			{
-				if (terrain[x][y][z]!=-1)
-				{
-					FVector Location(x * BLOCK_SIZE, y * BLOCK_SIZE, z * BLOCK_SIZE);
-					FTransform Transform(Location);
-					int32 InstID = HISM->AddInstance(Transform);
-					//HISM->SetCustomDataValue(InstID,1,FMath::RandRange(0,16),false);
-					HISM->SetCustomDataValue(InstID,1,terrain[x][y][z],false);
-				}				
-			}
+			NewChunk(x,y);
+			Async(EAsyncExecution::ThreadPool, [&])
+			Section++;
 		}
-	}
-	HISM->MarkRenderStateDirty();
+	}	
+}
+
+void ACubeGenerator::RemoveBlock(int64 Index, FVector hit)
+{
+	
+}
+
+void ACubeGenerator::NewChunk(int xChunk, int yChunk)
+{
+	UChunk* NewChunk = NewObject<UChunk>();
+	NewChunk->InitChunk();
+	for (int xPerlin = xChunk*CHUNK_SIZE, x =0; xPerlin <xChunk*CHUNK_SIZE+CHUNK_SIZE; xPerlin++,x++)
+	{
+		for (int yPerlin = yChunk*CHUNK_SIZE, y=0; yPerlin <yChunk*CHUNK_SIZE+CHUNK_SIZE; yPerlin++,y++)
+		{
+			NewChunk->Surface[x][y]  = mapHeight((Surface->Perlin2D(xPerlin, yPerlin,Scale,Octaves,Persistence,Lacunarity)),xPerlin,yPerlin);
+		}
+	}	
+	NewChunk->Fill();
+	ChunksMap.Add(Section,NewChunk);
+	
+	UMinecraftProceduralMeshComponent* ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
+	ProcMesh->RegisterComponent();
+	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
+	ProcMesh->SetCollisionEnabled(ECollisionEnabled::Type::QueryAndPhysics);
+	ProcMesh->SetRelativeLocation(FVector(xChunk*CHUNK_SIZE*BLOCK_SIZE, yChunk*CHUNK_SIZE*BLOCK_SIZE, 0));
+	MeshesMap.Add(Section,ProcMesh);	
+	GM = NewObject<UGreedyMeshing>();
+	GreedyMeshingMap.Add(Section,GM);
+	GM->BuildChunkMesh(NewChunk->GetTerrain());
+	FVector location = GM->CreateMesh(*ProcMesh,Mat,Section);
 }
 

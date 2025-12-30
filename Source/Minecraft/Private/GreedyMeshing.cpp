@@ -5,6 +5,7 @@
 
 #include "CubeGenerator.h"
 #include "ProceduralMeshComponent.h"
+#include "Minecraft/MinecraftProceduralMeshComponent.h"
 
 
 bool UGreedyMeshing::IsAir(int x, int y, int z, const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
@@ -107,22 +108,6 @@ void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<Bl
 				if (IsAir(x, y, z - 1, Blocks)) AddFace(BlockPos, EFace::NegZ,type);
 			}
 }
-void UGreedyMeshing::AddAtlasUVs(int TextureIndex)
-{
-	FIntPoint tile = AtlasFromIndex(TextureIndex);
-
-	float U0 = tile.X * TILE;
-	float V0 = tile.Y * TILE;
-	float U1 = U0 + TILE;
-	float V1 = V0 + TILE;
-
-	UVs.Append({
-		FVector2D(U0, V0),
-		FVector2D(U1, V0),
-		FVector2D(U1, V1),
-		FVector2D(U0, V1)
-	});
-}
 
 FIntPoint UGreedyMeshing::AtlasFromIndex(int Index)
 {
@@ -144,10 +129,10 @@ FVector4 UGreedyMeshing::GetBlockUV(BlockType Type)
 	}
 }
 
-void UGreedyMeshing::CreateMesh(UProceduralMeshComponent& procMesh,UMaterialInterface* Mat)
+FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section)
 {
 	procMesh.CreateMeshSection(
-	0,
+	Section,
 	Vertices,
 	Triangles,
 	Normals,
@@ -156,6 +141,12 @@ void UGreedyMeshing::CreateMesh(UProceduralMeshComponent& procMesh,UMaterialInte
 	TArray<FProcMeshTangent>(),
 	true
 );
-	procMesh.SetMaterial(0, Mat);
+	procMesh.SetIndex(Section);
+	procMesh.SetMaterial(Section, Mat);
+	Vertices.Reset();
+	Triangles.Reset();
+	Normals.Reset();
+	UVs.Reset();
+	return procMesh.GetComponentLocation();
 }
 

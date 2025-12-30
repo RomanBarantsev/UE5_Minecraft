@@ -9,7 +9,7 @@ enum BlockType
 {
 	Empty=-1,
 	Air   = 0,
-	Grass = 1,
+	Grass = 9,
 	Dirt  = 2,
 	Stone = 3
 };

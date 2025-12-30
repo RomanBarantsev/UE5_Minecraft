@@ -8,6 +8,7 @@
 #include "UObject/Object.h"
 #include "GreedyMeshing.generated.h"
 
+class UMinecraftProceduralMeshComponent;
 class UProceduralMeshComponent;
 
 enum class EFace
@@ -42,8 +43,7 @@ private:
 	void AddFace(const FVector& BlockPos, EFace Face, BlockType Type);
 	FVector4 GetBlockUV(BlockType Type);
 	FIntPoint AtlasFromIndex(int Index);
-	void AddAtlasUVs(int TextureIndex);
 public:
 	void BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
-	void CreateMesh(UProceduralMeshComponent& procMesh,UMaterialInterface* Mat);
+	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section);
 };

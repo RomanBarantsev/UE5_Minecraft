@@ -10,7 +10,9 @@
 #include "Minecraft/PerlinNoise3D.h"
 #include "CubeGenerator.generated.h"
 
+class UMinecraftProceduralMeshComponent;
 class UDataTable;
+class UGreedyMeshing;
 CONSTEXPR int BLOCK_SIZE = 256.0f;
 
 USTRUCT(BlueprintType)
@@ -31,8 +33,6 @@ UCLASS()
 class MINECRAFT_API ACubeGenerator : public AActor
 {
 	GENERATED_BODY()
-	UPROPERTY()
-	UHierarchicalInstancedStaticMeshComponent* HISM;
 public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();
@@ -60,18 +60,27 @@ protected:
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	
 	UPROPERTY(EditAnywhere)
-	UDataTable* PerlinNoiseTable;
-	UPROPERTY()
-	UChunk* NewChunk;	
+	UDataTable* PerlinNoiseTable;	
 	float Threshold = 0.1f;  // порог плотности
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
+	UPROPERTY()
+	TMap<int64,UChunk*> ChunksMap;
+	UPROPERTY()
+	TMap<int64,UGreedyMeshing*> GreedyMeshingMap;
+	UPROPERTY()
+	TMap<int64,UMinecraftProceduralMeshComponent*> MeshesMap;
+	int64 Section=0;
+	UPROPERTY()
+	UGreedyMeshing* GM;
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	void GenerateSurface();
 	int mapHeight(double n,int x,int y);
 	void LoadNoiseTemplate();
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
-	void DrawCall() const;
+	void ChunksInit();
+public:
+	void RemoveBlock(int64 Index, FVector hit);
+	void NewChunk(int xChunk, int yChunk);
 };
