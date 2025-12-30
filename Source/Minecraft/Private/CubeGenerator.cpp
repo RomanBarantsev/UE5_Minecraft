@@ -107,8 +107,7 @@ void ACubeGenerator::ChunksInit()
 	{
 		for (int y = 0; y < 10; y++)
 		{
-			NewChunk(x,y);
-			Async(EAsyncExecution::ThreadPool, [&])
+			NewChunk(x,y);			
 			Section++;
 		}
 	}	
@@ -121,8 +120,10 @@ void ACubeGenerator::RemoveBlock(int64 Index, FVector hit)
 
 void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 {
+	double TStart = FPlatformTime::Seconds();
 	UChunk* NewChunk = NewObject<UChunk>();
 	NewChunk->InitChunk();
+	double T1 = FPlatformTime::Seconds();
 	for (int xPerlin = xChunk*CHUNK_SIZE, x =0; xPerlin <xChunk*CHUNK_SIZE+CHUNK_SIZE; xPerlin++,x++)
 	{
 		for (int yPerlin = yChunk*CHUNK_SIZE, y=0; yPerlin <yChunk*CHUNK_SIZE+CHUNK_SIZE; yPerlin++,y++)
@@ -132,7 +133,8 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	}	
 	NewChunk->Fill();
 	ChunksMap.Add(Section,NewChunk);
-	
+	double T2 = FPlatformTime::Seconds();
+
 	UMinecraftProceduralMeshComponent* ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
 	ProcMesh->RegisterComponent();
 	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
@@ -142,6 +144,17 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	GM = NewObject<UGreedyMeshing>();
 	GreedyMeshingMap.Add(Section,GM);
 	GM->BuildChunkMesh(NewChunk->GetTerrain());
+	double T3 = FPlatformTime::Seconds();
 	FVector location = GM->CreateMesh(*ProcMesh,Mat,Section);
+	double T4 = FPlatformTime::Seconds();
+	UE_LOG(LogTemp, Warning,
+		TEXT("Chunk[%d,%d] Init: %.2f ms | Terrain: %.2f ms | Meshing: %.2f ms | MeshApply: %.2f ms | TOTAL: %.2f ms"),
+		xChunk, yChunk,
+		(T1-TStart)*1000,
+		(T2-T1)*1000,
+		(T3-T2)*1000,
+		(T4-T3)*1000,
+		(T4-TStart)*1000
+	);
 }
 
