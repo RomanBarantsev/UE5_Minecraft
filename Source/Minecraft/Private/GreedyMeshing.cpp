@@ -132,7 +132,7 @@ FVector4 UGreedyMeshing::GetBlockUV(BlockType Type)
 FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section)
 {
 	procMesh.CreateMeshSection(
-	Section,
+	0,
 	Vertices,
 	Triangles,
 	Normals,

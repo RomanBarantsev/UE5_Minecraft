@@ -71,8 +71,6 @@ protected:
 	UPROPERTY()
 	TMap<int64,UMinecraftProceduralMeshComponent*> MeshesMap;
 	int64 Section=0;
-	UPROPERTY()
-	UGreedyMeshing* GM;
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

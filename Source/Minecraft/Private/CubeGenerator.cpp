@@ -103,9 +103,9 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 void ACubeGenerator::ChunksInit()
 {	
 	 
-	for (int x = 0; x < 10; x++)
+	for (int x = 0; x < 5; x++)
 	{
-		for (int y = 0; y < 10; y++)
+		for (int y = 0; y < 5; y++)
 		{
 			NewChunk(x,y);			
 			Section++;
@@ -138,14 +138,22 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	UMinecraftProceduralMeshComponent* ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
 	ProcMesh->RegisterComponent();
 	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
-	ProcMesh->SetCollisionEnabled(ECollisionEnabled::Type::QueryAndPhysics);
+	ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ProcMesh->SetRelativeLocation(FVector(xChunk*CHUNK_SIZE*BLOCK_SIZE, yChunk*CHUNK_SIZE*BLOCK_SIZE, 0));
-	MeshesMap.Add(Section,ProcMesh);	
-	GM = NewObject<UGreedyMeshing>();
-	GreedyMeshingMap.Add(Section,GM);
-	GM->BuildChunkMesh(NewChunk->GetTerrain());
+	MeshesMap.Add(Section,ProcMesh);
+	
 	double T3 = FPlatformTime::Seconds();
-	FVector location = GM->CreateMesh(*ProcMesh,Mat,Section);
+	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
+	Async(EAsyncExecution::ThreadPool, [=]()
+		{			
+			GM->BuildChunkMesh(NewChunk->Terrain);
+			GreedyMeshingMap.Add(Section,GM);
+			AsyncTask(ENamedThreads::GameThread, [=]()
+			{
+				ProcMesh->ClearAllMeshSections();
+				GM->CreateMesh(*ProcMesh,Mat,0);
+			});
+		});
 	double T4 = FPlatformTime::Seconds();
 	UE_LOG(LogTemp, Warning,
 		TEXT("Chunk[%d,%d] Init: %.2f ms | Terrain: %.2f ms | Meshing: %.2f ms | MeshApply: %.2f ms | TOTAL: %.2f ms"),
