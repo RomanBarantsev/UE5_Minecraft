@@ -42,7 +42,6 @@ private:
 	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	void AddFace(const FVector& BlockPos, EFace Face, BlockType Type);
 	FVector4 GetBlockUV(BlockType Type);
-	FIntPoint AtlasFromIndex(int Index);
 public:
 	void BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section);

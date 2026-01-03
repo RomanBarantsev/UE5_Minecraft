@@ -109,12 +109,6 @@ void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<Bl
 			}
 }
 
-FIntPoint UGreedyMeshing::AtlasFromIndex(int Index)
-{
-	int x = Index % ATLAS_SIZE;
-	int y = Index / ATLAS_SIZE;
-	return { x, y };
-}
 
 FVector4 UGreedyMeshing::GetBlockUV(BlockType Type)
 {
