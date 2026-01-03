@@ -19,6 +19,7 @@ constexpr int CHUNK_Z = 256;
 constexpr int MIN_HEIGHT = 20;
 constexpr int MAX_HEIGHT = 96;
 constexpr int WATER_LEVEL = 62;
+CONSTEXPR int BLOCK_SIZE = 256.0f;
 
 UCLASS()
 class MINECRAFT_API UChunk : public UObject

@@ -13,7 +13,6 @@
 class UMinecraftProceduralMeshComponent;
 class UDataTable;
 class UGreedyMeshing;
-CONSTEXPR int BLOCK_SIZE = 256.0f;
 
 USTRUCT(BlueprintType)
 struct FPerlinNoiseBiom : public FTableRowBase
