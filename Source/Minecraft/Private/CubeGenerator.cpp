@@ -51,8 +51,9 @@ int ACubeGenerator::mapHeight(double n,int x,int y)
 	int h = FMath::FloorToInt(floor(MIN_HEIGHT + norm * (MAX_HEIGHT - MIN_HEIGHT)));
 	if (h < 1) h = 1;
 	if (h >= CHUNK_Z-1) h = CHUNK_Z-2;
+	
 	float cont = Continentalness->Perlin2D( x, y,ContScale,ContOctaves,ContPersistence,ContLacunarity);
-	cont=(cont+1.0f)/2;
+	cont=(cont + 1.0) * 0.5;
 	int contH=0;
 	float Y=0;
 	if (ContinentalnessCurve)
@@ -60,6 +61,7 @@ int ACubeGenerator::mapHeight(double n,int x,int y)
 		Y = ContinentalnessCurve->GetFloatValue(cont);
 	}
 	contH=static_cast<int>(Y);
+	UE_LOG(LogTemp, Warning, TEXT("contH:%f,cont:%f"),contH,cont);
 	int finalHeight = (int)(h + contH);
 	finalHeight = FMath::Clamp(finalHeight, 1, CHUNK_Z - 2);
 	return finalHeight;
@@ -103,9 +105,9 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 void ACubeGenerator::ChunksInit()
 {	
 	 
-	for (int x = 0; x < 5; x++)
+	for (int x = 0; x < 3; x++)
 	{
-		for (int y = 0; y < 5; y++)
+		for (int y = 0; y < 3; y++)
 		{
 			NewChunk(x,y);			
 			Section++;
@@ -143,14 +145,13 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	MeshesMap.Add(Section,ProcMesh);
 	
 	double T3 = FPlatformTime::Seconds();
-	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
+	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();	
 	Async(EAsyncExecution::ThreadPool, [=]()
 		{			
 			GM->BuildChunkMesh(NewChunk->Terrain);
 			GreedyMeshingMap.Add(Section,GM);
 			AsyncTask(ENamedThreads::GameThread, [=]()
-			{
-				ProcMesh->ClearAllMeshSections();
+			{				
 				GM->CreateMesh(*ProcMesh,Mat,0);
 			});
 		});
