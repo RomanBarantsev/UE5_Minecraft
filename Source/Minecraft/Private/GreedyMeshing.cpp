@@ -24,75 +24,6 @@ bool UGreedyMeshing::IsAir(int x, int y, int z, const std::vector<std::vector<st
 	return Blocks[x][y][z] == BlockType::Air;
 }
 
-void UGreedyMeshing::AddFace(const FVector& BlockPos, EFace Face, BlockType Type)
-{
-	int StartIndex = Vertices.Num();
-	FVector v0, v1, v2, v3;
-	FVector normal;
-	switch (Face)
-	{
-	case EFace::PosZ:
-		v0 = BlockPos + FVector(0, 0, BLOCK_SIZE);
-		v1 = BlockPos + FVector(0, BLOCK_SIZE, BLOCK_SIZE);
-		v2 = BlockPos + FVector(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-		v3 = BlockPos + FVector(BLOCK_SIZE, 0, BLOCK_SIZE);
-		normal = FVector::UpVector;
-		break;
-	case EFace::NegZ:
-		v0 = BlockPos + FVector(0, 0, 0);
-		v1 = BlockPos + FVector(BLOCK_SIZE, 0, 0);
-		v2 = BlockPos + FVector(BLOCK_SIZE, BLOCK_SIZE, 0);
-		v3 = BlockPos + FVector(0, BLOCK_SIZE, 0);
-		normal = FVector::DownVector;
-		break;
-	case EFace::PosY:
-		v0 = BlockPos + FVector(0, BLOCK_SIZE, 0);
-		v1 = BlockPos + FVector(BLOCK_SIZE, BLOCK_SIZE, 0);
-		v2 = BlockPos + FVector(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-		v3 = BlockPos + FVector(0, BLOCK_SIZE, BLOCK_SIZE);
-		normal = FVector::RightVector;
-		break;
-	case EFace::NegY:
-		v0 = BlockPos + FVector(BLOCK_SIZE, 0, 0);
-		v1 = BlockPos + FVector(0, 0, 0);
-		v2 = BlockPos + FVector(0, 0, BLOCK_SIZE);
-		v3 = BlockPos + FVector(BLOCK_SIZE, 0, BLOCK_SIZE);
-		normal = FVector::LeftVector;
-		break;
-	case EFace::PosX:
-		v0 = BlockPos + FVector(BLOCK_SIZE, BLOCK_SIZE, 0);
-		v1 = BlockPos + FVector(BLOCK_SIZE, 0, 0);
-		v2 = BlockPos + FVector(BLOCK_SIZE, 0, BLOCK_SIZE);
-		v3 = BlockPos + FVector(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-		normal = FVector::ForwardVector;
-		break;
-	case EFace::NegX:
-		v0 = BlockPos + FVector(0, 0, 0);
-		v1 = BlockPos + FVector(0, BLOCK_SIZE, 0);
-		v2 = BlockPos + FVector(0, BLOCK_SIZE, BLOCK_SIZE);
-		v3 = BlockPos + FVector(0, 0, BLOCK_SIZE);
-		normal = FVector::BackwardVector;
-		break;	
-	default:
-		return;
-	}
-	Vertices.Append({ v0, v1, v2, v3 });
-	Triangles.Append({
-		StartIndex + 0, StartIndex + 1, StartIndex + 2,
-		StartIndex + 0, StartIndex + 2, StartIndex + 3
-	});
-
-	for (int i = 0; i < 4; i++)
-		Normals.Add(normal);
-	
-	FVector4 UV = GetBlockUV(Type);
-	UVs.Append({
-	FVector2D(UV.X,          UV.Y),
-	FVector2D(UV.X + UV.Z,   UV.Y),
-	FVector2D(UV.X + UV.Z,   UV.Y + UV.W),
-	FVector2D(UV.X,          UV.Y + UV.W)
-	});
-}
 
 void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
 {
@@ -102,26 +33,6 @@ void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<Bl
 	GreedyXPos(Blocks, false);
 	GreedyYPos(Blocks, true);
 	GreedyYPos(Blocks, false);
-	for (int x = 0; x < CHUNK_SIZE; x++)
-		for (int y = 0; y < CHUNK_SIZE; y++)
-			for (int z = 0; z < CHUNK_Z; z++)
-			{
-				if (Blocks[x][y][z] == BlockType::Air)
-					continue;
-
-				FVector BlockPos(
-					x * BLOCK_SIZE,
-					y * BLOCK_SIZE,
-					z * BLOCK_SIZE
-				);
-				BlockType type = Blocks[x][y][z];
-				//if (IsAir(x + 1, y, z, Blocks)) AddFace(BlockPos, EFace::PosX,type);
-				//if (IsAir(x - 1, y, z, Blocks)) AddFace(BlockPos, EFace::NegX,type);
-				//if (IsAir(x, y + 1, z, Blocks)) AddFace(BlockPos, EFace::PosY,type);
-				//if (IsAir(x, y - 1, z, Blocks)) AddFace(BlockPos, EFace::NegY,type);
-				/*if (IsAir(x, y, z + 1, Blocks)) AddFace(BlockPos, EFace::PosZ,type);
-				if (IsAir(x, y, z - 1, Blocks)) AddFace(BlockPos, EFace::NegZ,type);*/
-			}
 }
 
 
@@ -212,7 +123,6 @@ void UGreedyMeshing::GreedyZPos(const std::vector<std::vector<std::vector<BlockT
 	}
 }
 
-
 void UGreedyMeshing::AddQuadZ(int x, int y, int z,int w, int h,bool bPositive,BlockType Type)
 {
 	FVector base(
@@ -250,6 +160,7 @@ void UGreedyMeshing::AddQuadZ(int x, int y, int z,int w, int h,bool bPositive,Bl
 		{UV.X + UV.Z * w, UV.Y}
 	});
 }
+
 void UGreedyMeshing::GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive)
 {
     int dx = bPositive ? 1 : -1;
@@ -406,6 +317,7 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
         {UV.X + UV.Z * w, UV.Y}
     });
 }
+
 void UGreedyMeshing::GreedyYPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive)
 {
     int dy = bPositive ? 1 : -1;
@@ -480,6 +392,7 @@ void UGreedyMeshing::GreedyYPos(const std::vector<std::vector<std::vector<BlockT
         }
     }
 }
+
 void UGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
 {
     // Для оси Y:

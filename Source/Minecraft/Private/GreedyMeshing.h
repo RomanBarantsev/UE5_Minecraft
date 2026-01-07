@@ -37,7 +37,6 @@ private:
 	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz,
 	                   const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
-	void AddFace(const FVector& BlockPos, EFace Face, BlockType Type);
 	FVector4 GetBlockUV(BlockType Type);
 	void GreedyZPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
 	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
