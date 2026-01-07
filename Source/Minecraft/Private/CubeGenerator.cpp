@@ -61,7 +61,7 @@ int ACubeGenerator::mapHeight(double n,int x,int y)
 		Y = ContinentalnessCurve->GetFloatValue(cont);
 	}
 	contH=static_cast<int>(Y);
-	UE_LOG(LogTemp, Warning, TEXT("contH:%f,cont:%f"),contH,cont);
+	//UE_LOG(LogTemp, Warning, TEXT("contH:%f,cont:%f"),contH,cont);
 	int finalHeight = (int)(h + contH);
 	finalHeight = FMath::Clamp(finalHeight, 1, CHUNK_Z - 2);
 	return finalHeight;

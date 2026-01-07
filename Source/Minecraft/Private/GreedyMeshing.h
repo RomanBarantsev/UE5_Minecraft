@@ -18,15 +18,10 @@ enum class EFace
 
 struct FMaskCell
 {
-	bool bVisible;
+	bool bValid = false;
 	BlockType Type;
-	bool bBackFace;
 };
 
-constexpr int MAX_DIM = FMath::Max(CHUNK_SIZE, CHUNK_Z);
-
-constexpr int ATLAS_SIZE = 4;          // 4x4
-constexpr float TILE = 1.0f / 4.0f;    // 0.25
 /**
  * 
  */
@@ -39,10 +34,19 @@ private:
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
+	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz,
+	                   const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	void AddFace(const FVector& BlockPos, EFace Face, BlockType Type);
 	FVector4 GetBlockUV(BlockType Type);
+	void GreedyZPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
+	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
+	void GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
+	void AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
+	void GreedyYPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
+
 public:
 	void BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
+	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section);
 };
