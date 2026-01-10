@@ -39,7 +39,6 @@ private:
 	                   const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	float GetTileIndex(BlockType Type);
-	void TestAtlasUVs();
 	void GreedyZPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
 	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 	void GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
@@ -51,9 +50,5 @@ public:
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat, const int64& Section);
-	void TestBasicUVs();
-	void TestGreedyTiling();
-	void TestWithCurrentMaterial();
-	void DebugUVCalculation();
-	void TestGreedyVsSimple();
+
 };
