@@ -3,6 +3,8 @@
 
 #include "CubeGenerator.h"
 
+#include <iostream>
+
 #include "GreedyMeshing.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
@@ -105,9 +107,9 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 void ACubeGenerator::ChunksInit()
 {	
 	 
-	for (int x = 0; x < 3; x++)
+	for (int x = 0; x < 1; x++)
 	{
-		for (int y = 0; y < 3; y++)
+		for (int y = 0; y < 1; y++)
 		{
 			NewChunk(x,y);			
 			Section++;

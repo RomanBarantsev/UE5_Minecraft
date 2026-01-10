@@ -27,25 +27,102 @@ bool UGreedyMeshing::IsAir(int x, int y, int z, const std::vector<std::vector<st
 
 void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
 {
-	//GreedyZPos(Blocks, false);
-	GreedyZPos(Blocks, true);
+	for (int x = 0; x < CHUNK_SIZE; x++)
+	{
+		for (int y = 0; y < CHUNK_SIZE; y++)
+		{
+			for (int z = 0; z < CHUNK_Z; z++)
+			{
+				BlockType type = Blocks[x][y][z];
+				if (type == BlockType::Air) continue;
+                
+				// Проверяем каждую грань
+				if (IsFaceVisible(x, y, z, 0, 0, 1, Blocks))  // Z+
+					AddQuadZ(x, y, z, 1, 1, true, type);
+				if (IsFaceVisible(x, y, z, 0, 0, -1, Blocks)) // Z-
+					AddQuadZ(x, y, z, 1, 1, false, type);
+				if (IsFaceVisible(x, y, z, 1, 0, 0, Blocks))  // X+
+					AddQuadX(x, y, z, 1, 1, true, type);
+				if (IsFaceVisible(x, y, z, -1, 0, 0, Blocks)) // X-
+					AddQuadX(x, y, z, 1, 1, false, type);
+				if (IsFaceVisible(x, y, z, 0, 1, 0, Blocks))  // Y+
+					AddQuadY(x, y, z, 1, 1, true, type);
+				if (IsFaceVisible(x, y, z, 0, -1, 0, Blocks)) // Y-
+					AddQuadY(x, y, z, 1, 1, false, type);
+			}
+		}
+	}
+	//TestAtlasUVs();	    
+	/*GreedyZPos(Blocks, true);
+	GreedyZPos(Blocks, false);
 	GreedyXPos(Blocks, true);
 	GreedyXPos(Blocks, false);
 	GreedyYPos(Blocks, true);
-	GreedyYPos(Blocks, false);
+	GreedyYPos(Blocks, false);*/
 }
 
-
-FVector4 UGreedyMeshing::GetBlockUV(BlockType Type)
+float UGreedyMeshing::GetTileIndex(BlockType Type)
 {
-	constexpr float T = 0.25;
-
+	// Предполагая что BlockType начинается с:
+	// Empty=0, Air=1, Grass=2, Dirt=3, Stone=4, ...
+    
 	switch (Type)
 	{
-	case BlockType::Grass: return FVector4(0*T, 0*T, T, T);
-	case BlockType::Dirt:  return FVector4(1*T, 0*T, T, T);
-	case BlockType::Stone: return FVector4(2*T, 0*T, T, T);
-	default:               return FVector4(0,   0,   T, T);
+	case BlockType::Grass:        return 0.0f;  // (0,0) - первая текстура в атласе
+	case BlockType::Dirt:         return 1.0f;  // (1,0)
+	case BlockType::Stone:        return 2.0f;  // (2,0)
+	case BlockType::Wood:         return 3.0f;  // (3,0)
+	case BlockType::Leaves:       return 4.0f;  // (0,1) - вторая строка
+	case BlockType::Sand:         return 5.0f;  // (1,1)
+	case BlockType::Gravel:       return 6.0f;  // (2,1)
+	case BlockType::Cobblestone:  return 7.0f;  // (3,1)
+	case BlockType::Bricks:       return 8.0f;  // (0,2)
+	case BlockType::Glass:        return 9.0f;  // (1,2)
+	case BlockType::Water:        return 10.0f; // (2,2)
+	case BlockType::Lava:         return 11.0f; // (3,2)
+	case BlockType::Bedrock:      return 12.0f; // (0,3)
+	case BlockType::IronBlock:    return 13.0f; // (1,3)
+	case BlockType::GoldBlock:    return 14.0f; // (2,3)
+	case BlockType::Empty:
+	case BlockType::Air:
+	default:
+		return 0.0f;  // Grass по умолчанию для воздуха/пустоты
+	}
+}
+
+void UGreedyMeshing::TestAtlasUVs()
+{
+	UE_LOG(LogTemp, Warning, TEXT("=== TESTING ATLAS UVs ==="));
+    
+	// Очищаем все
+	Vertices.Empty();
+	Triangles.Empty();
+	Normals.Empty();
+	UVs.Empty();
+	UV1s.Empty();
+    
+	// Создаем 6 граней с разными типами блоков
+	// Грани Y+
+	AddQuadY(0, 0, 0, 1, 1, true, BlockType::Grass);      // тайл 0,0
+	AddQuadY(1, 0, 0, 1, 1, true, BlockType::Dirt);       // тайл 1,0
+	AddQuadY(2, 0, 0, 1, 1, true, BlockType::Stone);      // тайл 2,0
+	AddQuadY(3, 0, 0, 1, 1, true, BlockType::Wood);       // тайл 3,0
+    
+	// Грани X+
+	AddQuadX(0, 1, 0, 1, 1, true, BlockType::Leaves);     // тайл 0,1
+	AddQuadX(1, 1, 0, 1, 1, true, BlockType::Sand);       // тайл 1,1
+	AddQuadX(2, 1, 0, 1, 1, true, BlockType::Gravel);     // тайл 2,1
+	AddQuadX(3, 1, 0, 1, 1, true, BlockType::Cobblestone);// тайл 3,1
+    
+	UE_LOG(LogTemp, Warning, TEXT("Test created: vertices=%d, uvs=%d"), 
+		Vertices.Num(), UVs.Num());
+    
+	// Проверяем UV
+	for (int i = 0; i < FMath::Min(UVs.Num(), 16); i += 4)
+	{
+		FVector2D uv = UVs[i];
+		UE_LOG(LogTemp, Warning, TEXT("Quad %d: first UV = (%f, %f)"), 
+			i/4, uv.X, uv.Y);
 	}
 }
 
@@ -123,42 +200,81 @@ void UGreedyMeshing::GreedyZPos(const std::vector<std::vector<std::vector<BlockT
 	}
 }
 
-void UGreedyMeshing::AddQuadZ(int x, int y, int z,int w, int h,bool bPositive,BlockType Type)
+void UGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
 {
-	FVector base(
-		x * BLOCK_SIZE,
-		y * BLOCK_SIZE,
-		z * BLOCK_SIZE + (bPositive ? BLOCK_SIZE : 0)
-	);
+    float zPos = bPositive ? (z + 1) * BLOCK_SIZE : z * BLOCK_SIZE;
 
-	FVector dx(w * BLOCK_SIZE, 0, 0);
-	FVector dy(0, h * BLOCK_SIZE, 0);
+    FVector base(
+        x * BLOCK_SIZE,
+        y * BLOCK_SIZE,
+        zPos
+    );
 
-	int start = Vertices.Num();
+    FVector dx(w * BLOCK_SIZE, 0, 0);
+    FVector dy(0, h * BLOCK_SIZE, 0);
 
-	Vertices.Add(base);
-	Vertices.Add(base + dy);
-	Vertices.Add(base + dx + dy);
-	Vertices.Add(base + dx);
+    int start = Vertices.Num();
 
-	if (bPositive)
-	{
-		Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
-		Normals.Append({ FVector::UpVector, FVector::UpVector, FVector::UpVector, FVector::UpVector });
-	}
-	else
-	{
-		Triangles.Append({ start, start+2, start+1, start, start+3, start+2 });
-		Normals.Append({ FVector::DownVector, FVector::DownVector, FVector::DownVector, FVector::DownVector });
-	}
-
-	FVector4 UV = GetBlockUV(Type);
-	UVs.Append({
-		{UV.X, UV.Y},
-		{UV.X, UV.Y + UV.W * h},
-		{UV.X + UV.Z * w, UV.Y + UV.W * h},
-		{UV.X + UV.Z * w, UV.Y}
-	});
+    if (bPositive)
+    {
+        Vertices.Add(base);                     // 0: нижний-левый
+        Vertices.Add(base + dy);                // 1: верхний-левый  
+        Vertices.Add(base + dx + dy);           // 2: верхний-правый
+        Vertices.Add(base + dx);                // 3: нижний-правый
+        
+        Triangles.Append({ start, start + 1, start + 2,
+                          start, start + 2, start + 3 });
+        Normals.Append({ FVector::UpVector, FVector::UpVector,
+                        FVector::UpVector, FVector::UpVector });
+    }
+    else
+    {
+        Vertices.Add(base);                     // 0: нижний-левый
+        Vertices.Add(base + dx);                // 1: нижний-правый
+        Vertices.Add(base + dx + dy);           // 2: верхний-правый
+        Vertices.Add(base + dy);                // 3: верхний-левый
+        
+        Triangles.Append({ start, start + 1, start + 2,
+                          start, start + 2, start + 3 });
+        Normals.Append({ FVector::DownVector, FVector::DownVector,
+                        FVector::DownVector, FVector::DownVector });
+    }
+    
+    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: передаем информацию о тайле через UV
+    // Формат: (localU + tileX, localV + tileY)
+    // Где localU = 0..w, localV = 0..h (для тайлинга)
+    // А tileX, tileY = позиция в атласе (0-3 для 4x4)
+    
+    const float AtlasSize = 4.0f;
+    float tileIndex = GetTileIndex(Type);
+    int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
+    int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
+    
+    // Добавляем смещение тайла к UV координатам
+    // В материале потом умножим на 2, возьмем Frac и умножим на 0.25
+    
+    if (bPositive)
+    {
+        // Вершина 0: (0, 0) -> (tileX + 0, tileY + 0)
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + 0.0f));
+        
+        // Вершина 1: (0, h) -> (tileX + 0, tileY + h)
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + (float)h));
+        
+        // Вершина 2: (w, h) -> (tileX + w, tileY + h)
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + (float)h));
+        
+        // Вершина 3: (w, 0) -> (tileX + w, tileY + 0)
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + 0.0f));
+    }
+    else
+    {
+        // Задняя грань (зеркально)
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + 0.0f));
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + 0.0f));
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + (float)h));
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + (float)h));
+    }
 }
 
 void UGreedyMeshing::GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive)
@@ -246,11 +362,6 @@ void UGreedyMeshing::GreedyXPos(const std::vector<std::vector<std::vector<BlockT
 
 void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
 {
-    // Для оси X:
-    // w - размер по Y (width)
-    // h - размер по Z (height)
-    
-    // Определяем координату плоскости X
     float xCoord;
     FVector Normal;
     
@@ -280,22 +391,20 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
     if (bPositive)
     {
         // X+: нормаль вправо (+X)
-        // Порядок вершин против часовой стрелки если смотреть снаружи
-        Vertices.Add(FVector(xCoord, baseY, baseZ));                     // 0: ближний-нижний
-        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        // 1: ближний-верхний
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); // 2: дальний-верхний
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         // 3: дальний-нижний
+        Vertices.Add(FVector(xCoord, baseY, baseZ));                     // 0
+        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        // 1
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); // 2
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         // 3
         
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     else
     {
         // X-: нормаль влево (-X)
-        // Порядок вершин по часовой стрелке если смотреть снаружи
-        Vertices.Add(FVector(xCoord, baseY, baseZ));                     // 0: ближний-нижний
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         // 1: дальний-нижний
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); // 2: дальний-верхний
-        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        // 3: ближний-верхний
+        Vertices.Add(FVector(xCoord, baseY, baseZ));                     // 0
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         // 1
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); // 2
+        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        // 3
         
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
@@ -306,16 +415,39 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
         Normals.Add(Normal);
     }
     
-    // UV координаты
-    FVector4 UV = GetBlockUV(Type);
+    // ====== ИСПРАВЛЕННЫЕ UV (как в AddQuadZ) ======
+    const float AtlasSize = 4.0f;
+    float tileIndex = GetTileIndex(Type);
+    int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
+    int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
     
-    // Масштабируем UV
-    UVs.Append({
-        {UV.X, UV.Y},
-        {UV.X, UV.Y + UV.W * h},
-        {UV.X + UV.Z * w, UV.Y + UV.W * h},
-        {UV.X + UV.Z * w, UV.Y}
-    });
+    if (bPositive)
+    {
+        // X+ грань
+        // UV для 4 вершин: (tileX + localU, tileY + localV)
+        // где localU = 0..w, localV = 0..h
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + 0.0f));      // 0
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + (float)h));  // 1
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + (float)h)); // 2
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + 0.0f));  // 3
+    }
+    else
+    {
+        // X- грань
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + 0.0f));  // 0
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + 0.0f));      // 1
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + (float)h));  // 2
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + (float)h)); // 3
+    }
+    
+    // UV1 — TileIndex (для альтернативного подхода)
+    for (int i = 0; i < 4; i++)
+    {
+        UV1s.Add(FVector2D(tileIndex, 0));
+    }
+    
+    UE_LOG(LogTemp, Warning, TEXT("AddQuadX: pos(%d,%d,%d) w=%d h=%d type=%d UV0:(%f,%f)"), 
+        x, y, z, w, h, (int)Type, UVs[UVs.Num()-4].X, UVs[UVs.Num()-4].Y);
 }
 
 void UGreedyMeshing::GreedyYPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive)
@@ -407,13 +539,13 @@ void UGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive,
     {
         // Y+ (грань смотрит в сторону +Y)
         yCoord = (y + 1) * BLOCK_SIZE;
-        Normal = FVector(0, 1, 0); // Нормаль в сторону +Y
+        Normal = FVector(0, 1, 0);
     }
     else
     {
         // Y- (грань смотрит в сторону -Y)
         yCoord = y * BLOCK_SIZE;
-        Normal = FVector(0, -1, 0); // Нормаль в сторону -Y
+        Normal = FVector(0, -1, 0);
     }
     
     // Базовые координаты
@@ -426,78 +558,77 @@ void UGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive,
     
     int start = Vertices.Num();
 
-    // Ключевое исправление: правильный порядок вершин
-    // Чтобы текстуры не смотрели внутрь, нужно обеспечить
-    // правильный порядок обхода вершин
-    
     if (bPositive)
     {
-        // Y+: грань смотрит в сторону +Y
-        // Порядок вершин должен быть ПО ЧАСОВОЙ СТРЕЛКЕ если смотреть изнутри блока
-        // или ПРОТИВ ЧАСОВОЙ если смотреть снаружи
+        // Y+ грань
+        Vertices.Add(FVector(baseX, yCoord, baseZ));                     // 0
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));         // 1
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); // 2
+        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        // 3
         
-        // Правильный порядок для +Y (снаружи):
-        Vertices.Add(FVector(baseX, yCoord, baseZ));                     // 0: левый-нижний
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));         // 1: правый-нижний
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); // 2: правый-верхний
-        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        // 3: левый-верхний
-        
-        // Треугольники: 0-1-2 и 0-2-3
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     else
     {
-        // Y-: грань смотрит в сторону -Y
-        // Порядок должен быть обратным
-        
-        Vertices.Add(FVector(baseX, yCoord, baseZ));                     // 0: левый-нижний
-        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        // 1: левый-верхний
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); // 2: правый-верхний
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));         // 3: правый-нижний
+        // Y- грань
+        Vertices.Add(FVector(baseX, yCoord, baseZ));                     // 0
+        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        // 1
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); // 2
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));         // 3
         
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     
-    // Добавляем нормали (уже правильные)
+    // Добавляем нормали
     for (int i = 0; i < 4; i++)
     {
         Normals.Add(Normal);
     }
     
-    // UV координаты
-    FVector4 UV = GetBlockUV(Type);
+    // ====== ИСПРАВЛЕННЫЕ UV (как в AddQuadZ) ======
+    const float AtlasSize = 4.0f;
+    float tileIndex = GetTileIndex(Type);
+    int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
+    int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
     
-    // Правильные UV для каждой грани
     if (bPositive)
     {
-        // +Y
-        UVs.Append({
-            {UV.X, UV.Y},                           // 0: левый-нижний
-            {UV.X + UV.Z * w, UV.Y},                // 1: правый-нижний
-            {UV.X + UV.Z * w, UV.Y + UV.W * h},     // 2: правый-верхний
-            {UV.X, UV.Y + UV.W * h}                 // 3: левый-верхний
-        });
+        // Y+ грань
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + 0.0f));      // 0
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + 0.0f));  // 1
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + (float)h)); // 2
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + (float)h));  // 3
     }
     else
     {
-        // -Y (возможно, нужно другую текстуру или зеркально)
-        UVs.Append({
-            {UV.X, UV.Y},                           // 0: левый-нижний
-            {UV.X, UV.Y + UV.W * h},                // 1: левый-верхний
-            {UV.X + UV.Z * w, UV.Y + UV.W * h},     // 2: правый-верхний
-            {UV.X + UV.Z * w, UV.Y}                 // 3: правый-нижний
-        });
+        // Y- грань
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + 0.0f));      // 0
+        UVs.Add(FVector2D((float)tileX + 0.0f, (float)tileY + (float)h));  // 1
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + (float)h)); // 2
+        UVs.Add(FVector2D((float)tileX + (float)w, (float)tileY + 0.0f));  // 3
     }
+    
+    // UV1 — TileIndex
+    for (int i = 0; i < 4; i++)
+    {
+        UV1s.Add(FVector2D(tileIndex, 0));
+    }
+    
+    UE_LOG(LogTemp, Warning, TEXT("AddQuadY: pos(%d,%d,%d) w=%d h=%d type=%d UV0:(%f,%f)"), 
+        x, y, z, w, h, (int)Type, UVs[UVs.Num()-4].X, UVs[UVs.Num()-4].Y);
 }
 
 FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section)
 {
 	procMesh.CreateMeshSection(
-	0,
+	Section,
 	Vertices,
 	Triangles,
 	Normals,
-	UVs,
+	UVs,     // UV0
+	UV1s,    // UV1
+	TArray<FVector2D>(), // UV2
+	TArray<FVector2D>(), // UV3
 	TArray<FColor>(),
 	TArray<FProcMeshTangent>(),
 	true
@@ -508,6 +639,6 @@ FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	Triangles.Reset();
 	Normals.Reset();
 	UVs.Reset();
+	UV1s.Reset();
 	return procMesh.GetComponentLocation();
 }
-

@@ -34,10 +34,12 @@ private:
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
+	TArray<FVector2D> UV1s; // Второй UV канал
 	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz,
 	                   const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
-	FVector4 GetBlockUV(BlockType Type);
+	float GetTileIndex(BlockType Type);
+	void TestAtlasUVs();
 	void GreedyZPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
 	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 	void GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
@@ -47,5 +49,6 @@ private:
 public:
 	void BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
-	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section);
+public:
+	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat, const int64& Section);
 };

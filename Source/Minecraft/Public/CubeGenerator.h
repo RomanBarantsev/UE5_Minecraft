@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Chaos/Vector.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/Chunk.h"
