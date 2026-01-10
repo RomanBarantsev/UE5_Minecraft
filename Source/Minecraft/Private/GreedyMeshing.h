@@ -51,4 +51,9 @@ public:
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat, const int64& Section);
+	void TestBasicUVs();
+	void TestGreedyTiling();
+	void TestWithCurrentMaterial();
+	void DebugUVCalculation();
+	void TestGreedyVsSimple();
 };

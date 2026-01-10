@@ -27,7 +27,7 @@ bool UGreedyMeshing::IsAir(int x, int y, int z, const std::vector<std::vector<st
 
 void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
 {
-	for (int x = 0; x < CHUNK_SIZE; x++)
+	/*for (int x = 0; x < CHUNK_SIZE; x++)
 	{
 		for (int y = 0; y < CHUNK_SIZE; y++)
 		{
@@ -51,7 +51,8 @@ void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<Bl
 					AddQuadY(x, y, z, 1, 1, false, type);
 			}
 		}
-	}
+	}*/
+	TestGreedyTiling();
 	//TestAtlasUVs();	    
 	/*GreedyZPos(Blocks, true);
 	GreedyZPos(Blocks, false);
@@ -65,7 +66,7 @@ float UGreedyMeshing::GetTileIndex(BlockType Type)
 {
 	// Предполагая что BlockType начинается с:
 	// Empty=0, Air=1, Grass=2, Dirt=3, Stone=4, ...
-    
+    return FMath::RandRange(0,14);
 	switch (Type)
 	{
 	case BlockType::Grass:        return 0.0f;  // (0,0) - первая текстура в атласе
@@ -641,4 +642,256 @@ FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	UVs.Reset();
 	UV1s.Reset();
 	return procMesh.GetComponentLocation();
+}
+
+
+void UGreedyMeshing::TestGreedyTiling()
+{
+    UE_LOG(LogTemp, Warning, TEXT("=== TESTING GREEDY TILING ==="));
+    
+    // Очищаем всё
+    Vertices.Empty();
+    Triangles.Empty();
+    Normals.Empty();
+    UVs.Empty();
+    UV1s.Empty();
+    
+    // Локальная исправленная функция для теста
+    auto AddQuadYFixed = [this](int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
+    {
+        // Геометрия (как обычно)
+        float yCoord = bPositive ? (y + 1) * BLOCK_SIZE : y * BLOCK_SIZE;
+        FVector Normal = bPositive ? FVector(0, 1, 0) : FVector(0, -1, 0);
+        
+        float baseX = x * BLOCK_SIZE;
+        float baseZ = z * BLOCK_SIZE;
+        float quadWidth = w * BLOCK_SIZE;
+        float quadHeight = h * BLOCK_SIZE;
+        
+        int start = Vertices.Num();
+        
+        if (bPositive)
+        {
+            Vertices.Add(FVector(baseX, yCoord, baseZ));
+            Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));
+            Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight));
+            Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));
+            
+            Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
+        }
+        else
+        {
+            Vertices.Add(FVector(baseX, yCoord, baseZ));
+            Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));
+            Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight));
+            Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));
+            
+            Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
+        }
+        
+        // Нормали
+        for (int i = 0; i < 4; i++) Normals.Add(Normal);
+        
+        // ====== ПРАВИЛЬНЫЕ UV С ТАЙЛИНГОМ ======
+        const float AtlasSize = 4.0f;
+        const float TILE_SIZE = 1.0f / AtlasSize; // 0.25
+        
+        // Получаем правильный tileIndex для типа блока
+        float tileIndex = 0.0f;
+        switch (Type)
+        {
+        case BlockType::Grass:        tileIndex = 0.0f;  break; // (0,0)
+        case BlockType::Dirt:         tileIndex = 1.0f;  break; // (1,0)
+        case BlockType::Stone:        tileIndex = 2.0f;  break; // (2,0)
+        case BlockType::Wood:         tileIndex = 3.0f;  break; // (3,0)
+        case BlockType::Leaves:       tileIndex = 4.0f;  break; // (0,1)
+        case BlockType::Sand:         tileIndex = 5.0f;  break; // (1,1)
+        case BlockType::Gravel:       tileIndex = 6.0f;  break; // (2,1)
+        case BlockType::Cobblestone:  tileIndex = 7.0f;  break; // (3,1)
+        default:                      tileIndex = 0.0f;  break;
+        }
+        
+        int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
+        int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
+        
+        // Координаты тайла в атласе (в нормализованном диапазоне 0.0-1.0)
+        float baseU = tileX * TILE_SIZE;
+        float baseV = tileY * TILE_SIZE;
+    	UE_LOG(LogTemp, Warning, TEXT("Tile %d -> (%d,%d) baseUV=(%f,%f)"),
+	(int)tileIndex, tileX, tileY, baseU, baseV);
+        // ВАРИАНТ 1: Один растянутый тайл (правильный вариант для вашего случая)
+    	if (false)
+    	{
+    		if (bPositive)
+    		{
+    			UVs.Add({0,0});
+    			UVs.Add({(float)w,0});
+    			UVs.Add({(float)w,(float)h});
+    			UVs.Add({0,(float)h});
+    		}
+    		else
+    		{
+    			UVs.Add({(float)w,0});
+    			UVs.Add({0,0});
+    			UVs.Add({0,(float)h});
+    			UVs.Add({(float)w,(float)h});
+    		}
+
+    		for(int i=0;i<4;i++)
+    			UV1s.Add({baseU, baseV});
+    	}
+        // ВАРИАНТ 2: Тайлинг (повторение текстуры)
+        else
+        {
+            // UV координаты для тайлинга в шейдере
+            // В шейдере: tiledUV = frac(UV0 * float2(w, h)) * TILE_SIZE + float2(baseU, baseV)
+            if (bPositive)
+            {
+                UVs.Add(FVector2D(0.0f, 0.0f));        // Умножим на w и h в шейдере
+                UVs.Add(FVector2D((float)w, 0.0f));    // w повторений по U
+                UVs.Add(FVector2D((float)w, (float)h)); // w по U, h по V
+                UVs.Add(FVector2D(0.0f, (float)h));    // h повторений по V
+            }
+            else
+            {
+                UVs.Add(FVector2D((float)w, 0.0f));
+                UVs.Add(FVector2D(0.0f, 0.0f));
+                UVs.Add(FVector2D(0.0f, (float)h));
+                UVs.Add(FVector2D((float)w, (float)h));
+            }
+            
+            // UV1 храним: x = baseU, y = baseV
+            for (int i = 0; i < 4; i++)
+            {
+            	 baseU = tileX * TILE_SIZE;
+            	 baseV = tileY * TILE_SIZE;
+
+            	UV1s.Add(FVector2D(baseU, baseV));
+            }
+            
+            UE_LOG(LogTemp, Warning, TEXT("  UV: tiling %dx%d, base tile [%f,%f]"), 
+                w, h, baseU, baseV);
+        }
+    };
+    
+    // Создаем 8 отдельных поверхностей (квадов) в ряд
+    UE_LOG(LogTemp, Warning, TEXT("1. Single block (1x1) - Grass"));
+    AddQuadYFixed(0, 0, 0, 1, 1, true, BlockType::Grass);
+    
+    UE_LOG(LogTemp, Warning, TEXT("2. Merged width (2x1) - Dirt"));
+    AddQuadYFixed(2, 0, 0, 2, 1, true, BlockType::Dirt);
+    
+    UE_LOG(LogTemp, Warning, TEXT("3. Merged height (1x2) - Stone"));
+    AddQuadYFixed(5, 0, 0, 1, 2, true, BlockType::Stone);
+    
+    UE_LOG(LogTemp, Warning, TEXT("4. Big merged (2x2) - Wood"));
+    AddQuadYFixed(8, 0, 0, 2, 2, true, BlockType::Wood);
+    
+    UE_LOG(LogTemp, Warning, TEXT("5. Very wide (4x1) - Leaves"));
+    AddQuadYFixed(0, 3, 0, 4, 1, true, BlockType::Leaves);
+    
+    UE_LOG(LogTemp, Warning, TEXT("6. Very tall (1x4) - Sand"));
+    AddQuadYFixed(5, 3, 0, 1, 4, true, BlockType::Sand);
+    
+    UE_LOG(LogTemp, Warning, TEXT("7. Big square (3x3) - Gravel"));
+    AddQuadYFixed(0, 8, 0, 3, 3, true, BlockType::Gravel);
+    
+    UE_LOG(LogTemp, Warning, TEXT("8. Rectangle (3x2) - Cobblestone"));
+    AddQuadYFixed(4, 8, 0, 3, 2, true, BlockType::Cobblestone);
+    
+    UE_LOG(LogTemp, Warning, TEXT("Test created: %d vertices, %d quads"), 
+        Vertices.Num(), Vertices.Num() / 4);
+    
+    // Выводим UV для каждого квада
+    for (int quadIndex = 0; quadIndex < 8; quadIndex++)
+    {
+        int uvStart = quadIndex * 4;
+        if (uvStart + 3 < UVs.Num())
+        {
+            FVector2D uv0 = UVs[uvStart];
+            FVector2D uv1 = UVs[uvStart + 1];
+            FVector2D uv2 = UVs[uvStart + 2];
+            FVector2D uv3 = UVs[uvStart + 3];
+            
+            UE_LOG(LogTemp, Warning, TEXT("Quad %d UV0:"), quadIndex + 1);
+            UE_LOG(LogTemp, Warning, TEXT("  v0: (%f, %f)"), uv0.X, uv0.Y);
+            UE_LOG(LogTemp, Warning, TEXT("  v1: (%f, %f)"), uv1.X, uv1.Y);
+            UE_LOG(LogTemp, Warning, TEXT("  v2: (%f, %f)"), uv2.X, uv2.Y);
+            UE_LOG(LogTemp, Warning, TEXT("  v3: (%f, %f)"), uv3.X, uv3.Y);
+            
+            // Проверяем диапазон UV - должен быть 0.0-1.0
+            if (uv0.X < 0.0f || uv0.X > 1.0f || uv0.Y < 0.0f || uv0.Y > 1.0f)
+            {
+                UE_LOG(LogTemp, Error, TEXT("  ERROR: UV out of range! Should be 0.0-1.0"));
+            }
+            
+            // Если используем UV1 для базовых координат
+            if (uvStart + 3 < UV1s.Num())
+            {
+                FVector2D uv1_0 = UV1s[uvStart];
+                UE_LOG(LogTemp, Warning, TEXT("  UV1 base: (%f, %f)"), uv1_0.X, uv1_0.Y);
+            }
+        }
+    }
+}
+
+void UGreedyMeshing::TestWithCurrentMaterial()
+{
+	UE_LOG(LogTemp, Warning, TEXT("=== TEST WITH CURRENT MATERIAL ==="));
+    
+	Vertices.Empty(); Triangles.Empty(); Normals.Empty(); UVs.Empty(); UV1s.Empty();
+    
+	// Создаем несколько квадов
+	// 1. Grass (тайл 0,0)
+	AddQuadY(0, 0, 0, 1, 1, true, BlockType::Grass);
+    
+	// 2. Dirt (тайл 1,0) с тайлингом 2x1
+	AddQuadY(2, 0, 0, 2, 1, true, BlockType::Dirt);
+    
+	// 3. Stone (тайл 2,0) с тайлингом 1x2  
+	AddQuadY(5, 0, 0, 1, 2, true, BlockType::Stone);
+    
+	UE_LOG(LogTemp, Warning, TEXT("Created %d quads"), Vertices.Num() / 4);
+    
+	// Проверим что передаем
+	for (int quad = 0; quad < 3; quad++)
+	{
+		int start = quad * 4;
+		UE_LOG(LogTemp, Warning, TEXT("Quad %d:"), quad);
+		UE_LOG(LogTemp, Warning, TEXT("  UV0: (%f,%f), (%f,%f), (%f,%f), (%f,%f)"),
+			UVs[start].X, UVs[start].Y, UVs[start+1].X, UVs[start+1].Y,
+			UVs[start+2].X, UVs[start+2].Y, UVs[start+3].X, UVs[start+3].Y);
+		UE_LOG(LogTemp, Warning, TEXT("  UV1 base: (%f,%f)"), 
+			UV1s[start].X, UV1s[start].Y);
+	}
+}
+
+void UGreedyMeshing::DebugUVCalculation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("=== DEBUG UV CALCULATION ==="));
+    
+	// Проверяем GetTileIndex для разных типов
+	UE_LOG(LogTemp, Warning, TEXT("Testing GetTileIndex:"));
+	UE_LOG(LogTemp, Warning, TEXT("  Grass (%d) -> %f"), (int)BlockType::Grass, GetTileIndex(BlockType::Grass));
+	UE_LOG(LogTemp, Warning, TEXT("  Dirt (%d) -> %f"), (int)BlockType::Dirt, GetTileIndex(BlockType::Dirt));
+	UE_LOG(LogTemp, Warning, TEXT("  Stone (%d) -> %f"), (int)BlockType::Stone, GetTileIndex(BlockType::Stone));
+	UE_LOG(LogTemp, Warning, TEXT("  Water (%d) -> %f"), (int)BlockType::Water, GetTileIndex(BlockType::Water));
+    
+	// Проверяем расчет UV
+	const float TILE_SIZE = 0.25f;
+    
+	for (int i = 0; i < 5; i++)
+	{
+		float tileIndex = (float)i;
+		int tileX = FMath::FloorToInt(tileIndex) % 4;
+		int tileY = FMath::FloorToInt(tileIndex) / 4;
+        
+		float minU = tileX * TILE_SIZE;
+		float minV = tileY * TILE_SIZE;
+		float maxU = minU + TILE_SIZE;
+		float maxV = minV + TILE_SIZE;
+        
+		UE_LOG(LogTemp, Warning, TEXT("Tile %d -> pos(%d,%d) UV: [%f,%f]-[%f,%f]"), 
+			i, tileX, tileY, minU, minV, maxU, maxV);
+	}
 }
