@@ -1,59 +1,76 @@
 ﻿#pragma once
-#include <array>
-
+#include <vector>
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "Chunk.generated.h"
 
-
-enum BlockType
+enum BlockType : uint8
 {
-	Empty = 0,      // Полностью пусто (не рисуется)
-	Air = 1,        // Воздух (прозрачный, но может быть для логики)
-	Grass = 2,      // Трава
-	Dirt = 3,       // Земля
-	Stone = 4,      // Камень
-	Wood = 5,       // Дерево
-	Leaves = 6,     // Листья
-	Sand = 7,       // Песок
-	Gravel = 8,     // Гравий
-	Cobblestone = 9,// Булыжник
-	Bricks = 10,    // Кирпичи
-	Glass = 11,     // Стекло
-	Water = 12,     // Вода
-	Lava = 13,      // Лава
-	Bedrock = 14,   // Бе́дрок
-	IronBlock = 15, // Железный блок
-	GoldBlock = 16, // Золотой блок
-    
-	// Для удобства
-	Count = 17      // Количество типов блоков
+	Empty = 0,
+	Air,
+	Grass,
+	Dirt,
+	Stone,
+	Wood,
+	Leaves,
+	Sand,
+	Gravel,
+	Cobblestone,
+	Bricks,
+	Glass,
+	Water,
+	Lava,
+	Bedrock,
+	IronBlock,
+	GoldBlock,
+	Count
 };
 
-CONSTEXPR int BLOCK_SIZE = 256.0f;
-constexpr uint8_t CHUNK_SIZE = 64;
-constexpr uint16_t CHUNK_Z = 256;
+constexpr int BLOCK_SIZE = 256;
+
+constexpr int CHUNK_X = 64;
+constexpr int CHUNK_Y = 64;
+constexpr int CHUNK_Z = 256;
 constexpr uint8_t MIN_HEIGHT = 20;
 constexpr uint8_t MAX_HEIGHT = 96;
-constexpr uint8_t WATER_LEVEL = 62;
+constexpr int Z_STRIDE = 1;
+constexpr int Y_STRIDE = CHUNK_Z;
+constexpr int X_STRIDE = CHUNK_Z * CHUNK_Y;
 
-
+constexpr int TOTAL_BLOCKS = CHUNK_X * CHUNK_Y * CHUNK_Z;
 
 UCLASS()
 class MINECRAFT_API UChunk : public UObject
 {
 	GENERATED_BODY()
+
 private:
-	static constexpr int SLICE_SIZE = CHUNK_SIZE * CHUNK_SIZE;	
-	static constexpr int TOTAL_BLOCKS = SLICE_SIZE  * CHUNK_Z;
-	std::array<BlockType,TOTAL_BLOCKS> Cubes;
-	std::array<uint16_t,SLICE_SIZE> Surface;	
-	std::array<BlockType,TOTAL_BLOCKS> Chunks;
-	inline int Index(uint8_t x, uint8_t y, uint16_t z) const;
-	inline int SurfaceIndex(uint8_t x, uint8_t y) const;
+	std::vector<uint8> Blocks;     // BlockType as uint8
+	std::vector<uint16> Surface;
+
+	FORCEINLINE int Index(int x, int y, int z) const
+	{
+		return z + y * Y_STRIDE + x * X_STRIDE;
+	}
+
+	FORCEINLINE int SurfaceIndex(int x, int y) const
+	{
+		return x + y * CHUNK_X;
+	}
+
 public:
-	void SetBlock(uint8_t x,uint8_t y,uint16_t z,BlockType type);
-	BlockType GetBlock(uint8_t x, uint8_t y, uint16_t z) const;
-	void SetSurfaceHeight(uint8_t x,uint8_t y,uint16_t height);
+	UChunk();
+
+	FORCEINLINE void SetBlock(int x, int y, int z, BlockType type)
+	{
+		Blocks[Index(x,y,z)] = (uint8)type;
+	}
+
+	FORCEINLINE BlockType GetBlock(int x, int y, int z) const
+	{
+		return (BlockType)Blocks[Index(x,y,z)];
+	}
+
+	void SetSurfaceHeight(int x, int y, int height);
 	void Fill();
 };

@@ -1,54 +1,44 @@
 ﻿#include "Chunk.h"
 
-#include "DSP/AudioDebuggingUtilities.h"
-
-int UChunk::Index(uint8_t x, uint8_t y, uint16_t z) const
+UChunk::UChunk()
 {
-	return x+y*CHUNK_SIZE+z*SLICE_SIZE;
+	Blocks.resize(TOTAL_BLOCKS, BlockType::Empty);
+	Surface.resize(CHUNK_X * CHUNK_Y, 0);
 }
 
-int UChunk::SurfaceIndex(uint8_t x, uint8_t y) const
+void UChunk::SetSurfaceHeight(int x, int y, int height)
 {
-	return x + y * CHUNK_SIZE;
-}
-
-void UChunk::SetBlock(uint8_t x, uint8_t y, uint16_t z, BlockType type)
-{
-	Cubes[Index(x,y,z)]=type;
-}
-
-BlockType UChunk::GetBlock(uint8_t x, uint8_t y, uint16_t z) const
-{
-	return Cubes[Index(x,y,z)];
-}
-
-void UChunk::SetSurfaceHeight(uint8_t x,uint8_t y,uint16_t height)
-{
-	Surface[SurfaceIndex(x,y)]=height;
+	Surface[SurfaceIndex(x,y)] = height;
 }
 
 void UChunk::Fill()
 {
-	for (int x = 0; x < CHUNK_SIZE; x++)
+	for (int x = 0; x < CHUNK_X; x++)
 	{
-		for (int y = 0; y < CHUNK_SIZE; y++)
+		const int xOff = x * X_STRIDE;
+
+		for (int y = 0; y < CHUNK_Y; y++)
 		{
+			const int yOff = xOff + y * Y_STRIDE;
+			const int surface = Surface[SurfaceIndex(x,y)];
+
 			for (int z = 0; z < CHUNK_Z; z++)
 			{
-				if (z>Surface[SurfaceIndex(x,y)])
+				const int idx = yOff + z;
+
+				if (z > surface)
 				{
-					Cubes[Index(x,y,z)] = BlockType::Air;
+					Blocks[idx] = Air;
 				}
-				if (Cubes[Index(x,y,z)] == BlockType::Empty)
+				else if (z == surface)
 				{
-					Cubes[Index(x,y,z)] = BlockType::Stone;
+					Blocks[idx] = Bricks;
 				}
-				if (z==Surface[SurfaceIndex(x,y)])
+				else if (Blocks[idx] == Empty)
 				{
-					Cubes[Index(x,y,z)] = BlockType::Bricks;
+					Blocks[idx] = Stone;
 				}
 			}
 		}
 	}
 }
-

@@ -127,9 +127,9 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	double TStart = FPlatformTime::Seconds();
 	UChunk* NewChunk = NewObject<UChunk>();
 	double T1 = FPlatformTime::Seconds();
-	for (int xPerlin = xChunk*CHUNK_SIZE, x =0; xPerlin <xChunk*CHUNK_SIZE+CHUNK_SIZE; xPerlin++,x++)
+	for (int xPerlin = xChunk*CHUNK_X, x =0; xPerlin <xChunk*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
-		for (int yPerlin = yChunk*CHUNK_SIZE, y=0; yPerlin <yChunk*CHUNK_SIZE+CHUNK_SIZE; yPerlin++,y++)
+		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
 		{
 			NewChunk->SetSurfaceHeight(x,y,mapHeight((Surface->Perlin2D(xPerlin, yPerlin,Scale,Octaves,Persistence,Lacunarity)),xPerlin,yPerlin));
 		}
@@ -142,7 +142,7 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	ProcMesh->RegisterComponent();
 	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
 	ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	ProcMesh->SetRelativeLocation(FVector(xChunk*CHUNK_SIZE*BLOCK_SIZE, yChunk*CHUNK_SIZE*BLOCK_SIZE, 0));
+	ProcMesh->SetRelativeLocation(FVector(xChunk*CHUNK_X*BLOCK_SIZE, yChunk*CHUNK_X*BLOCK_SIZE, 0));
 	MeshesMap.Add(Section,ProcMesh);
 	
 	double T3 = FPlatformTime::Seconds();

@@ -18,7 +18,7 @@ bool UGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 
 bool UGreedyMeshing::IsAir(int x, int y, int z)
 {
-	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE || z >= CHUNK_Z)
+	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X || y >= CHUNK_X || z >= CHUNK_Z)
 		return true; // за границей = воздух
 	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
@@ -66,22 +66,22 @@ float UGreedyMeshing::GetTileIndex(BlockType Type)
 void UGreedyMeshing::GreedyZPos(bool bPositive)
 {
 	
-	FMaskCell Mask[CHUNK_SIZE][CHUNK_SIZE];
+	FMaskCell Mask[CHUNK_X][CHUNK_X];
 	int dz = bPositive ? 1 : -1;
 
 	for (int z = 0; z < CHUNK_Z; z++)
 	{
 		//clear mask
-		for (int x = 0; x < CHUNK_SIZE; x++)
+		for (int x = 0; x < CHUNK_X; x++)
 		{
-			for (int y = 0; y < CHUNK_SIZE; y++)
+			for (int y = 0; y < CHUNK_X; y++)
 			{
 				Mask[x][y].bValid = false;
 			}
 		}
 		// 1. build mask
-		for (int x = 0; x < CHUNK_SIZE; x++)
-			for (int y = 0; y < CHUNK_SIZE; y++)
+		for (int x = 0; x < CHUNK_X; x++)
+			for (int y = 0; y < CHUNK_X; y++)
 			{
 				int nz = z + dz;
 				if (nz < 0 || nz >= CHUNK_Z) continue;
@@ -94,8 +94,8 @@ void UGreedyMeshing::GreedyZPos(bool bPositive)
 			}
 
 		// 2. greedy merge mask
-		for (int x = 0; x < CHUNK_SIZE; x++)
-			for (int y = 0; y < CHUNK_SIZE; y++)
+		for (int x = 0; x < CHUNK_X; x++)
+			for (int y = 0; y < CHUNK_X; y++)
 			{
 				if (!Mask[x][y].bValid)
 					continue;
@@ -103,7 +103,7 @@ void UGreedyMeshing::GreedyZPos(bool bPositive)
 				BlockType Type = Mask[x][y].Type;
 
 				int width = 1;
-				while (x + width < CHUNK_SIZE &&
+				while (x + width < CHUNK_X &&
 					   Mask[x + width][y].bValid &&
 					   Mask[x + width][y].Type == Type)
 				{
@@ -112,7 +112,7 @@ void UGreedyMeshing::GreedyZPos(bool bPositive)
 
 				int height = 1;
 				bool done = false;
-				while (y + height < CHUNK_SIZE && !done)
+				while (y + height < CHUNK_X && !done)
 				{
 					for (int i = 0; i < width; i++)
 					{
@@ -218,20 +218,20 @@ void UGreedyMeshing::GreedyXPos(bool bPositive)
     int dx = bPositive ? 1 : -1;
 
     // НУЖНО ИЗМЕНИТЬ РАЗМЕР МАСКИ ДЛЯ ОСИ X!
-    // Для оси X: маска должна быть размером [CHUNK_SIZE][CHUNK_Z]
+    // Для оси X: маска должна быть размером [CHUNK_X][CHUNK_Z]
     
     // Создаем маску с правильными размерами
-    std::vector<std::vector<FMaskCell>> Mask(CHUNK_SIZE, std::vector<FMaskCell>(CHUNK_Z));
+    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X, std::vector<FMaskCell>(CHUNK_Z));
 
-    for (int x = 0; x < CHUNK_SIZE; x++)
+    for (int x = 0; x < CHUNK_X; x++)
     {
         // 1. Очистить маску для текущего слоя X
-        for (int y = 0; y < CHUNK_SIZE; y++)
+        for (int y = 0; y < CHUNK_X; y++)
             for (int z = 0; z < CHUNK_Z; z++)
                 Mask[y][z].bValid = false;
 
         // 2. Построить маску видимых граней
-        for (int y = 0; y < CHUNK_SIZE; y++)
+        for (int y = 0; y < CHUNK_X; y++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
             {
@@ -245,7 +245,7 @@ void UGreedyMeshing::GreedyXPos(bool bPositive)
         }
 
         // 3. Объединение видимых граней (Greedy алгоритм)
-        for (int y = 0; y < CHUNK_SIZE; y++)
+        for (int y = 0; y < CHUNK_X; y++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
             {
@@ -256,7 +256,7 @@ void UGreedyMeshing::GreedyXPos(bool bPositive)
 
                 // Находим ширину (по оси Y)
                 int width = 1;
-                while (y + width < CHUNK_SIZE &&
+                while (y + width < CHUNK_X &&
                        Mask[y + width][z].bValid &&
                        Mask[y + width][z].Type == CurrentType)
                 {
@@ -390,18 +390,18 @@ void UGreedyMeshing::GreedyYPos(bool bPositive)
 {
     int dy = bPositive ? 1 : -1;
 
-    // Для оси Y: маска должна быть размером [CHUNK_SIZE][CHUNK_Z]
-    std::vector<std::vector<FMaskCell>> Mask(CHUNK_SIZE, std::vector<FMaskCell>(CHUNK_Z));
+    // Для оси Y: маска должна быть размером [CHUNK_X][CHUNK_Z]
+    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X, std::vector<FMaskCell>(CHUNK_Z));
 
-    for (int y = 0; y < CHUNK_SIZE; y++)
+    for (int y = 0; y < CHUNK_X; y++)
     {
         // Очистить маску
-        for (int x = 0; x < CHUNK_SIZE; x++)
+        for (int x = 0; x < CHUNK_X; x++)
             for (int z = 0; z < CHUNK_Z; z++)
                 Mask[x][z].bValid = false;
 
         // Построить маску
-        for (int x = 0; x < CHUNK_SIZE; x++)
+        for (int x = 0; x < CHUNK_X; x++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
             {
@@ -414,7 +414,7 @@ void UGreedyMeshing::GreedyYPos(bool bPositive)
         }
 
         // Объединение
-        for (int x = 0; x < CHUNK_SIZE; x++)
+        for (int x = 0; x < CHUNK_X; x++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
             {
@@ -424,7 +424,7 @@ void UGreedyMeshing::GreedyYPos(bool bPositive)
                 BlockType CurrentType = Mask[x][z].Type;
 
                 int width = 1;
-                while (x + width < CHUNK_SIZE &&
+                while (x + width < CHUNK_X &&
                        Mask[x + width][z].bValid &&
                        Mask[x + width][z].Type == CurrentType)
                 {
