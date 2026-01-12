@@ -107,9 +107,9 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 void ACubeGenerator::ChunksInit()
 {	
 	 
-	for (int x = 0; x < 1; x++)
+	for (int x = 0; x < 5; x++)
 	{
-		for (int y = 0; y < 1; y++)
+		for (int y = 0; y < 5; y++)
 		{
 			NewChunk(x,y);			
 			Section++;
@@ -126,13 +126,12 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 {
 	double TStart = FPlatformTime::Seconds();
 	UChunk* NewChunk = NewObject<UChunk>();
-	NewChunk->InitChunk();
 	double T1 = FPlatformTime::Seconds();
 	for (int xPerlin = xChunk*CHUNK_SIZE, x =0; xPerlin <xChunk*CHUNK_SIZE+CHUNK_SIZE; xPerlin++,x++)
 	{
 		for (int yPerlin = yChunk*CHUNK_SIZE, y=0; yPerlin <yChunk*CHUNK_SIZE+CHUNK_SIZE; yPerlin++,y++)
 		{
-			NewChunk->Surface[x][y]  = mapHeight((Surface->Perlin2D(xPerlin, yPerlin,Scale,Octaves,Persistence,Lacunarity)),xPerlin,yPerlin);
+			NewChunk->SetSurfaceHeight(x,y,mapHeight((Surface->Perlin2D(xPerlin, yPerlin,Scale,Octaves,Persistence,Lacunarity)),xPerlin,yPerlin));
 		}
 	}	
 	NewChunk->Fill();
@@ -150,7 +149,7 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();	
 	Async(EAsyncExecution::ThreadPool, [=]()
 		{			
-			GM->BuildChunkMesh(NewChunk->Terrain);
+			GM->BuildChunkMesh(NewChunk);
 			GreedyMeshingMap.Add(Section,GM);
 			AsyncTask(ENamedThreads::GameThread, [=]()
 			{				

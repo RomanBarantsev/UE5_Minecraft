@@ -6,32 +6,33 @@
 #include "ProceduralMeshComponent.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
-bool UGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz,	const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
+bool UGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 {
-	BlockType a = Blocks[x][y][z];
-	BlockType b = IsAir(x + dx, y + dy, z + dz, Blocks)
+	BlockType a = Chunk->GetBlock(x,y,z);
+	BlockType b = IsAir(x + dx, y + dy, z + dz)
 				  ? BlockType::Air
-				  : Blocks[x + dx][y + dy][z + dz];
+				  : Chunk->GetBlock(x + dx,y + dy,z + dz);
 
 	return a != BlockType::Air && b == BlockType::Air;
 }
 
-bool UGreedyMeshing::IsAir(int x, int y, int z, const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
+bool UGreedyMeshing::IsAir(int x, int y, int z)
 {
 	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE || z >= CHUNK_Z)
 		return true; // за границей = воздух
-	return Blocks[x][y][z] == BlockType::Air;
+	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
 
 
-void UGreedyMeshing::BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks)
+void UGreedyMeshing::BuildChunkMesh(const UChunk* ch)
 {	
-	GreedyZPos(Blocks, true);
-	GreedyZPos(Blocks, false);
-	GreedyXPos(Blocks, true);
-	GreedyXPos(Blocks, false);
-	GreedyYPos(Blocks, true);
-	GreedyYPos(Blocks, false);
+	Chunk = ch;
+	GreedyZPos( true);
+	GreedyZPos( false);
+	GreedyXPos( true);
+	GreedyXPos( false);
+	GreedyYPos( true);
+	GreedyYPos( false);
 }
 
 float UGreedyMeshing::GetTileIndex(BlockType Type)
@@ -62,7 +63,7 @@ float UGreedyMeshing::GetTileIndex(BlockType Type)
 	}
 }
 
-void UGreedyMeshing::GreedyZPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks,bool bPositive)
+void UGreedyMeshing::GreedyZPos(bool bPositive)
 {
 	
 	FMaskCell Mask[CHUNK_SIZE][CHUNK_SIZE];
@@ -85,10 +86,10 @@ void UGreedyMeshing::GreedyZPos(const std::vector<std::vector<std::vector<BlockT
 				int nz = z + dz;
 				if (nz < 0 || nz >= CHUNK_Z) continue;
 
-				if (IsFaceVisible(x, y, z, 0, 0, dz, Blocks))
+				if (IsFaceVisible(x, y, z, 0, 0, dz))
 				{
 					Mask[x][y].bValid = true;
-					Mask[x][y].Type = Blocks[x][y][z];
+					Mask[x][y].Type =  Chunk->GetBlock(x,y,z);
 				}
 			}
 
@@ -212,7 +213,7 @@ void UGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive,
 		UV1s.Add({ baseU, baseV });
 }
 
-void UGreedyMeshing::GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive)
+void UGreedyMeshing::GreedyXPos(bool bPositive)
 {
     int dx = bPositive ? 1 : -1;
 
@@ -235,10 +236,10 @@ void UGreedyMeshing::GreedyXPos(const std::vector<std::vector<std::vector<BlockT
             for (int z = 0; z < CHUNK_Z; z++)
             {
                 // Проверяем грани по оси X
-                if (IsFaceVisible(x, y, z, dx, 0, 0, Blocks))
+                if (IsFaceVisible(x, y, z, dx, 0, 0))
                 {
                     Mask[y][z].bValid = true;
-                    Mask[y][z].Type = Blocks[x][y][z];
+                    Mask[y][z].Type =  Chunk->GetBlock(x,y,z);
                 }
             }
         }
@@ -385,7 +386,7 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
    
 }
 
-void UGreedyMeshing::GreedyYPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive)
+void UGreedyMeshing::GreedyYPos(bool bPositive)
 {
     int dy = bPositive ? 1 : -1;
 
@@ -404,10 +405,10 @@ void UGreedyMeshing::GreedyYPos(const std::vector<std::vector<std::vector<BlockT
         {
             for (int z = 0; z < CHUNK_Z; z++)
             {
-                if (IsFaceVisible(x, y, z, 0, dy, 0, Blocks))
+                if (IsFaceVisible(x, y, z, 0, dy, 0))
                 {
                     Mask[x][z].bValid = true;
-                    Mask[x][z].Type = Blocks[x][y][z];
+                    Mask[x][z].Type =  Chunk->GetBlock(x,y,z);
                 }
             }
         }

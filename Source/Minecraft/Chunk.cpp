@@ -2,22 +2,29 @@
 
 #include "DSP/AudioDebuggingUtilities.h"
 
-void UChunk::InitChunk()
+int UChunk::Index(uint8_t x, uint8_t y, uint16_t z) const
 {
-	std::vector<BlockType> z(CHUNK_Z, BlockType::Empty);
-	std::vector<std::vector<BlockType>> y(CHUNK_SIZE,z);
-	std::vector<std::vector<std::vector<BlockType>>> x(CHUNK_SIZE,y);
-	Terrain = x;
-	std::vector<int> SurfX(CHUNK_SIZE, 0);
-	std::vector<std::vector<int>> SurfY(CHUNK_SIZE,SurfX);
-	Surface = SurfY;
-	std::vector<char16_t> zFloor(CHUNK_Z, 0);
-	std::vector<std::vector<char16_t>> yFloor(CHUNK_SIZE,zFloor);
+	return x+y*CHUNK_SIZE+z*SLICE_SIZE;
 }
 
-void UChunk::SetBlock(int x, int y, int z, BlockType type)
+int UChunk::SurfaceIndex(uint8_t x, uint8_t y) const
 {
-	Terrain[x][y][z] = type;
+	return x + y * CHUNK_SIZE;
+}
+
+void UChunk::SetBlock(uint8_t x, uint8_t y, uint16_t z, BlockType type)
+{
+	Cubes[Index(x,y,z)]=type;
+}
+
+BlockType UChunk::GetBlock(uint8_t x, uint8_t y, uint16_t z) const
+{
+	return Cubes[Index(x,y,z)];
+}
+
+void UChunk::SetSurfaceHeight(uint8_t x,uint8_t y,uint16_t height)
+{
+	Surface[SurfaceIndex(x,y)]=height;
 }
 
 void UChunk::Fill()
@@ -28,20 +35,20 @@ void UChunk::Fill()
 		{
 			for (int z = 0; z < CHUNK_Z; z++)
 			{
-				if (z>Surface[x][y])
+				if (z>Surface[SurfaceIndex(x,y)])
 				{
-					Terrain[x][y][z] = BlockType::Air;
+					Cubes[Index(x,y,z)] = BlockType::Air;
 				}
-				if (Terrain[x][y][z] == BlockType::Empty)
+				if (Cubes[Index(x,y,z)] == BlockType::Empty)
 				{
-					Terrain[x][y][z] = BlockType::Stone;
+					Cubes[Index(x,y,z)] = BlockType::Stone;
+				}
+				if (z==Surface[SurfaceIndex(x,y)])
+				{
+					Cubes[Index(x,y,z)] = BlockType::Bricks;
 				}
 			}
 		}
 	}
 }
 
-std::vector<std::vector<std::vector<BlockType>>>& UChunk::GetTerrain()
-{
-	return Terrain;
-}

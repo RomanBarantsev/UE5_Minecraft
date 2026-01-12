@@ -35,18 +35,18 @@ private:
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
 	TArray<FVector2D> UV1s; // Второй UV канал
-	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz,
-	                   const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
-	bool IsAir(int x, int y, int z,const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
+	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz);
+	bool IsAir(int x, int y, int z);
 	float GetTileIndex(BlockType Type);
-	void GreedyZPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
+	void GreedyZPos(bool bPositive);
 	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
-	void GreedyXPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
+	void GreedyXPos(bool bPositive);
 	void AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
-	void GreedyYPos(const std::vector<std::vector<std::vector<BlockType>>>& Blocks, bool bPositive);
-
+	void GreedyYPos(bool bPositive);
+	UPROPERTY()
+	const UChunk* Chunk;
 public:
-	void BuildChunkMesh(const std::vector<std::vector<std::vector<BlockType>>>& Blocks);
+	void BuildChunkMesh(const UChunk* ch);
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat, const int64& Section);
