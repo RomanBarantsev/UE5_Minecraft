@@ -43,7 +43,9 @@ protected:
 	UPROPERTY()
 	UPerlinNoise2D* Continentalness;
 	UPROPERTY()
-	UPerlinNoise2D* Errosion;		
+	UPerlinNoise2D* Errosion;
+	UPROPERTY()
+	UPerlinNoise3D* Caves;		
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
 	float Scale;
@@ -58,8 +60,7 @@ protected:
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	
 	UPROPERTY(EditAnywhere)
-	UDataTable* PerlinNoiseTable;	
-	float Threshold = 0.1f;  // порог плотности
+	UDataTable* PerlinNoiseTable;
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
 	UPROPERTY()
@@ -79,4 +80,5 @@ private:
 public:
 	void RemoveBlock(int64 Index, FVector hit);
 	void NewChunk(int xChunk, int yChunk);
+	
 };

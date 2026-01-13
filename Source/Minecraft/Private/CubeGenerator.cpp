@@ -35,6 +35,7 @@ void ACubeGenerator::BeginPlay()
 	Super::BeginPlay();	
 	Surface = NewObject<UPerlinNoise2D>();
 	Continentalness = NewObject<UPerlinNoise2D>();
+	Caves = NewObject<UPerlinNoise3D>();
 	//time start
 	LoadNoiseTemplate();
 	ChunksInit();
@@ -49,6 +50,7 @@ void ACubeGenerator::Tick(float DeltaTime)
 
 int ACubeGenerator::mapHeight(double n,int x,int y)
 {
+	static int staticCont=0;
 	double norm = (n + 1.0) * 0.5;
 	int h = FMath::FloorToInt(floor(MIN_HEIGHT + norm * (MAX_HEIGHT - MIN_HEIGHT)));
 	if (h < 1) h = 1;
@@ -62,10 +64,9 @@ int ACubeGenerator::mapHeight(double n,int x,int y)
 	{
 		Y = ContinentalnessCurve->GetFloatValue(cont);
 	}
-	contH=static_cast<int>(Y);
-	//UE_LOG(LogTemp, Warning, TEXT("contH:%f,cont:%f"),contH,cont);
-	int finalHeight = (int)(h + contH);
-	finalHeight = FMath::Clamp(finalHeight, 1, CHUNK_Z - 2);
+	contH=static_cast<int>(Y);	
+	int finalHeight = (int)(contH+h);
+	//finalHeight = FMath::Clamp(finalHeight, 1, CHUNK_Z - 2);
 	return finalHeight;
 }
 
@@ -135,6 +136,8 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 		}
 	}	
 	NewChunk->Fill();
+	
+	
 	ChunksMap.Add(Section,NewChunk);
 	double T2 = FPlatformTime::Seconds();
 
