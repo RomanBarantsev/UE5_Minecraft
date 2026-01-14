@@ -6,7 +6,7 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/Chunk.h"
-#include "Minecraft/PerlinNoise3D.h"
+#include "Minecraft/FastNoiseLite.h"
 #include "CubeGenerator.generated.h"
 
 class UMinecraftProceduralMeshComponent;
@@ -27,6 +27,18 @@ struct FPerlinNoiseBiom : public FTableRowBase
 	float Lacunarity;
 };
 
+USTRUCT(BlueprintType)
+struct FNoisesParams
+{
+	GENERATED_BODY()
+public:	
+	float Scale;
+	float Octaves;
+	float Persistence;
+	float Lacunarity;
+	FName rowName;
+};
+
 UCLASS()
 class MINECRAFT_API ACubeGenerator : public AActor
 {
@@ -38,24 +50,16 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	const int CubeSpacing = 0;
-	UPROPERTY()
-	UPerlinNoise2D* Surface;
-	UPROPERTY()
-	UPerlinNoise2D* Continentalness;
-	UPROPERTY()
-	UPerlinNoise2D* Errosion;
-	UPROPERTY()
-	UPerlinNoise3D* Caves;		
+	
+	FastNoiseLite CavesNoise;
+	FastNoiseLite SurfaceNoise;
+	FastNoiseLite ContNoise;
+	FNoisesParams CavesParams;
+	FNoisesParams SurfaceParams;
+	FNoisesParams ContParams;
+	
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
-	float Scale;
-	float Octaves;
-	float Persistence;
-	float Lacunarity;
-	float ContScale;
-	float ContOctaves;
-	float ContPersistence;
-	float ContLacunarity;
 	
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	
@@ -70,11 +74,14 @@ protected:
 	UPROPERTY()
 	TMap<int64,UMinecraftProceduralMeshComponent*> MeshesMap;
 	int64 Section=0;
+
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	int mapHeight(double n,int x,int y);
-	void LoadNoiseTemplate();
+	void CavesCreate(UChunk* chunk,int xChunk, int yChunk);
+	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
 	void ChunksInit();
 public:

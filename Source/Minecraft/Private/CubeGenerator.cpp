@@ -2,15 +2,13 @@
 
 
 #include "CubeGenerator.h"
-
-#include <iostream>
-
 #include "GreedyMeshing.h"
+#include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
-
 
 class UProceduralMeshComponent;
 // Sets default values
+
 ACubeGenerator::ACubeGenerator()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -33,11 +31,16 @@ ACubeGenerator::ACubeGenerator()
 void ACubeGenerator::BeginPlay()
 {
 	Super::BeginPlay();	
-	Surface = NewObject<UPerlinNoise2D>();
-	Continentalness = NewObject<UPerlinNoise2D>();
-	Caves = NewObject<UPerlinNoise3D>();
+	CavesParams.rowName="Caves";
+	SurfaceParams.rowName="Surface";
+	ContParams.rowName="Continentalness";
+	LoadNoiseParams(CavesNoise,CavesParams);
+	LoadNoiseParams(SurfaceNoise,SurfaceParams);
+	LoadNoiseParams(ContNoise,ContParams);
+	SetNoiseParams(CavesNoise,CavesParams, FastNoiseLite::NoiseType_Perlin);
+	SetNoiseParams(SurfaceNoise,SurfaceParams, FastNoiseLite::NoiseType_Perlin);	
+	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);	
 	//time start
-	LoadNoiseTemplate();
 	ChunksInit();
 	//time end
 }
@@ -48,6 +51,16 @@ void ACubeGenerator::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
+{
+	Noise.SetSeed(Seed);           // Seed для разнообразия
+	Noise.SetFrequency(params.Scale);   // Масштаб шума (аналог Scale)
+	Noise.SetFractalOctaves(params.Octaves);    // 4 октавы для детализации
+	Noise.SetFractalGain(params.Persistence);   // Затухание амплитуды (Persistence)
+	Noise.SetFractalLacunarity(params.Lacunarity); // Рост частоты (Lacunarity)
+	Noise.SetNoiseType(noiseType); // Тип шума — Perlin
+}
+
 int ACubeGenerator::mapHeight(double n,int x,int y)
 {
 	static int staticCont=0;
@@ -56,7 +69,7 @@ int ACubeGenerator::mapHeight(double n,int x,int y)
 	if (h < 1) h = 1;
 	if (h >= CHUNK_Z-1) h = CHUNK_Z-2;
 	
-	float cont = Continentalness->Perlin2D( x, y,ContScale,ContOctaves,ContPersistence,ContLacunarity);
+	float cont = ContNoise.GetNoise((float)x, (float)y);
 	cont=(cont + 1.0) * 0.5;
 	int contH=0;
 	float Y=0;
@@ -70,23 +83,34 @@ int ACubeGenerator::mapHeight(double n,int x,int y)
 	return finalHeight;
 }
 
-void ACubeGenerator::LoadNoiseTemplate()
-{
-	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Surface","name");	
-	if (Row)
+void ACubeGenerator::CavesCreate(UChunk* chunk,int xChunk, int yChunk) //TODO объеденить с Fill
+{	
+	
+	float  delimiter=0.01;
+	for (int xPerlin = xChunk*CHUNK_X, x =0; xPerlin <xChunk*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
-		Scale = Row->Scale;
-		Octaves = Row->Octaves;
-		Persistence = Row->Persistence;
-		Lacunarity = Row->Lacunarity;
+		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
+		{
+			for (int z = 0; z < CHUNK_Z; ++z)
+			{	
+				float density = CavesNoise.GetNoise((float)xPerlin, (float)yPerlin, (float)z);
+				if (density > -0.0f) {
+					chunk->SetBlock(x, y, z, BlockType::Air);
+				}
+			}
+		}
 	}
-	Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>("Continentalness","name");	
+}
+
+void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params)
+{
+	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>(params.rowName,"name");	
 	if (Row)
 	{
-		ContScale = Row->Scale;
-		ContOctaves = Row->Octaves;
-		ContPersistence = Row->Persistence;
-		ContLacunarity = Row->Lacunarity;
+		params.Scale = Row->Scale;
+		params.Octaves = Row->Octaves;
+		params.Persistence = Row->Persistence;
+		params.Lacunarity = Row->Lacunarity;
 	}
 }
 
@@ -132,11 +156,11 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	{
 		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
 		{
-			NewChunk->SetSurfaceHeight(x,y,mapHeight((Surface->Perlin2D(xPerlin, yPerlin,Scale,Octaves,Persistence,Lacunarity)),xPerlin,yPerlin));
+			NewChunk->SetSurfaceHeight(x,y,mapHeight(SurfaceNoise.GetNoise((float)xPerlin,(float)yPerlin),xPerlin,yPerlin));
 		}
 	}	
 	NewChunk->Fill();
-	
+	CavesCreate(NewChunk,xChunk,yChunk);
 	
 	ChunksMap.Add(Section,NewChunk);
 	double T2 = FPlatformTime::Seconds();
