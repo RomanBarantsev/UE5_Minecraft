@@ -5,10 +5,12 @@
 
 #include "CubeGenerator.h"
 #include "MinecraftProceduralMeshComponent.h"
-#include "ProceduralMeshComponent.h"
+#include "GameFramework/FloatingPawnMovement.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 
+class UCharacterMovementComponent;
 // Sets default values
 AMC_Pawn::AMC_Pawn()
 {
@@ -19,8 +21,13 @@ AMC_Pawn::AMC_Pawn()
 // Called when the game starts or when spawned
 void AMC_Pawn::BeginPlay()
 {
-	Super::BeginPlay();
-	
+	Super::BeginPlay();	
+	if (UFloatingPawnMovement* Move = FindComponentByClass<UFloatingPawnMovement>())
+	{
+		Move->MaxSpeed = 600000.f;        // было ~1200
+		Move->Acceleration = 120000.f;   // быстрее разгон
+		Move->Deceleration = 120000.f;
+	}	
 }
 
 // Called every frame
@@ -28,6 +35,7 @@ void AMC_Pawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
+
 
 void AMC_Pawn::Fire()
 {
@@ -48,10 +56,22 @@ void AMC_Pawn::Fire()
 		
 }
 
+void AMC_Pawn::Redraw()
+{
+	TArray<AActor*> OutActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(),ACubeGenerator::StaticClass(),OutActors);
+	auto CubeGenerator = Cast<ACubeGenerator>(OutActors[0]);
+	if (CubeGenerator)
+	{
+		CubeGenerator->Draw();
+	}
+}
+
 // Called to bind functionality to input
 void AMC_Pawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	InputComponent->BindAction("Fire",IE_Pressed,this,&ThisClass::Fire);
+	InputComponent->BindAction("Redraw",IE_Pressed,this,&ThisClass::Redraw);
 }
 
