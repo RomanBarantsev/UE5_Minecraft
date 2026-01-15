@@ -75,11 +75,9 @@ protected:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
 	UPROPERTY()
-	TMap<int64,UChunk*> ChunksMap;
+	TMap<UMinecraftProceduralMeshComponent*,UChunk*> MeshesMap;
 	UPROPERTY()
-	TMap<int64,UGreedyMeshing*> GreedyMeshingMap;
-	UPROPERTY()
-	TMap<int64,UMinecraftProceduralMeshComponent*> MeshesMap;
+	TArray<UGreedyMeshing*> GreedyMeshings;
 	int64 Section=0;
 
 private:
@@ -93,7 +91,7 @@ private:
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
 	void ChunksInit();
 public:
-	void RemoveBlock(int64 Index, FVector hit);
+	void RemoveBlock(FVector hit,UMinecraftProceduralMeshComponent* mesh);
 	void NewChunk(int xChunk, int yChunk);
 	void Draw();
 };

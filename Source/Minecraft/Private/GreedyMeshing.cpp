@@ -24,7 +24,7 @@ bool UGreedyMeshing::IsAir(int x, int y, int z)
 }
 
 
-void UGreedyMeshing::BuildChunkMesh(const UChunk* ch)
+void UGreedyMeshing::BuildGreedyMesh(const UChunk* ch)
 {	
 	Chunk = ch;
 	GreedyZPos( true);

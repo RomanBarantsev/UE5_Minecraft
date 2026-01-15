@@ -6,6 +6,9 @@
 #include "GameFramework/DefaultPawn.h"
 #include "MC_Pawn.generated.h"
 
+class ACubeGenerator;
+class UGreedyMeshing;
+
 UCLASS()
 class MINECRAFT_API AMC_Pawn : public ADefaultPawn
 {
@@ -22,7 +25,10 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	void PlaceAboveSurface();
 	void Fire();
+	UPROPERTY()
+	ACubeGenerator* CubeGenerator;
 	void Redraw();
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

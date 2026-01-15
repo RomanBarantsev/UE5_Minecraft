@@ -46,9 +46,9 @@ private:
 	UPROPERTY()
 	const UChunk* Chunk;
 public:
-	void BuildChunkMesh(const UChunk* ch);
+	void BuildGreedyMesh(const UChunk* ch);
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat, const int64& Section);
-
+	
 };

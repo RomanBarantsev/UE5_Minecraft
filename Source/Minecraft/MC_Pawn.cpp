@@ -27,7 +27,14 @@ void AMC_Pawn::BeginPlay()
 		Move->MaxSpeed = 600000.f;        // было ~1200
 		Move->Acceleration = 120000.f;   // быстрее разгон
 		Move->Deceleration = 120000.f;
-	}	
+	}
+	TArray<AActor*> OutActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(),ACubeGenerator::StaticClass(),OutActors);
+	CubeGenerator = Cast<ACubeGenerator>(OutActors[0]);
+	if (!CubeGenerator)
+	{
+		UE_LOG(LogTemp,Error,TEXT("CubeGenerator is nullptr"));
+	}
 }
 
 // Called every frame
@@ -36,35 +43,28 @@ void AMC_Pawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-
 void AMC_Pawn::Fire()
 {
-	FVector StartPos=GetActorLocation();
-	FVector EndPos=StartPos+GetControlRotation().Vector()*1000;
+	FVector StartPos = GetActorLocation();
+	FVector EndPos = StartPos + GetControlRotation().Vector() * 1000;
 	TArray<AActor*> ActorsToIgnore;
-	FHitResult OutHit;	
-	UKismetSystemLibrary::LineTraceSingle(GetWorld(),StartPos,EndPos,TraceTypeQuery1,false,ActorsToIgnore,EDrawDebugTrace::ForDuration,OutHit,true);	
-	if (const auto& CubeGenerator = Cast<ACubeGenerator>(OutHit.GetActor()))
+	FHitResult Hit;
+	if (UKismetSystemLibrary::LineTraceSingle(GetWorld(),StartPos,EndPos,TraceTypeQuery1,false,ActorsToIgnore,EDrawDebugTrace::None,Hit,true))
 	{
-		if (const auto& Chunk = Cast<UMinecraftProceduralMeshComponent> (OutHit.GetComponent()))
-		{
-			FVector WorldHitLocation = OutHit.Location;
-			FVector LocalHitLocation = Chunk->GetComponentTransform().InverseTransformPosition(WorldHitLocation);
-			UE_LOG(LogTemp,Display,TEXT("%f %f %f"),LocalHitLocation.X/BLOCK_SIZE,LocalHitLocation.Y/BLOCK_SIZE,LocalHitLocation.Z/BLOCK_SIZE);
-		}
-	}
-		
+		auto Mesh = Cast<UMinecraftProceduralMeshComponent>(Hit.GetComponent());
+		if (!Mesh) return;
+
+		constexpr float EPS = 0.1f;
+
+		FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
+		FVector LocalPos =Mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);
+		CubeGenerator->RemoveBlock(LocalPos, Mesh);
+	}		
 }
 
 void AMC_Pawn::Redraw()
 {
-	TArray<AActor*> OutActors;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(),ACubeGenerator::StaticClass(),OutActors);
-	auto CubeGenerator = Cast<ACubeGenerator>(OutActors[0]);
-	if (CubeGenerator)
-	{
-		CubeGenerator->Draw();
-	}
+	CubeGenerator->Draw();
 }
 
 // Called to bind functionality to input

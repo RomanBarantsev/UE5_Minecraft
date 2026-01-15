@@ -177,7 +177,7 @@ void ACubeGenerator::ChunksInit()
 {
 	for (auto mesh : MeshesMap)
 	{
-		mesh.Value->ClearAllMeshSections();
+		mesh.Key->ClearAllMeshSections();
 	} 
 	for (int x = 0; x < 5; x++)
 	{
@@ -189,9 +189,18 @@ void ACubeGenerator::ChunksInit()
 	}	
 }
 
-void ACubeGenerator::RemoveBlock(int64 Index, FVector hit)
+void ACubeGenerator::RemoveBlock(FVector hit, UMinecraftProceduralMeshComponent* mesh)
 {
-	
+	UChunk* Chunk = MeshesMap[mesh];
+	UE_LOG(LogTemp,Display,TEXT("%d %d %d"),(int)hit.X/BLOCK_SIZE,(int)hit.Y/BLOCK_SIZE,(int)hit.Z/BLOCK_SIZE);
+	int X = FMath::FloorToInt(hit.X / BLOCK_SIZE);
+	int Y = FMath::FloorToInt(hit.Y / BLOCK_SIZE);
+	int Z = FMath::FloorToInt(hit.Z / BLOCK_SIZE);
+	Chunk->SetBlock(X,Y,Z,BlockType::Air);
+	mesh->ClearAllMeshSections();
+	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
+	GM->BuildGreedyMesh(Chunk);
+	GM->CreateMesh(*mesh,Mat,0);
 }
 
 void ACubeGenerator::NewChunk(int xChunk, int yChunk)
@@ -209,7 +218,6 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	NewChunk->Fill();
 	CavesCreate(NewChunk,xChunk,yChunk);
 	
-	ChunksMap.Add(Section,NewChunk);
 	double T2 = FPlatformTime::Seconds();
 
 	UMinecraftProceduralMeshComponent* ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
@@ -217,20 +225,20 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
 	ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ProcMesh->SetRelativeLocation(FVector(xChunk*CHUNK_X*BLOCK_SIZE, yChunk*CHUNK_X*BLOCK_SIZE, 0));
-	MeshesMap.Add(Section,ProcMesh);
+	MeshesMap.Add(ProcMesh,NewChunk);
 	
 	double T3 = FPlatformTime::Seconds();
-	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();	
+	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
 	Async(EAsyncExecution::ThreadPool, [=]()
 		{			
-			GM->BuildChunkMesh(NewChunk);
-			GreedyMeshingMap.Add(Section,GM);
+			GM->BuildGreedyMesh(NewChunk);
 			AsyncTask(ENamedThreads::GameThread, [=]()
 			{				
 				GM->CreateMesh(*ProcMesh,Mat,0);
 			});
 		});
 	double T4 = FPlatformTime::Seconds();
+	//GreedyMeshings.Add(GM);
 	UE_LOG(LogTemp, Warning,
 		TEXT("Chunk[%d,%d] Init: %.2f ms | Terrain: %.2f ms | Meshing: %.2f ms | MeshApply: %.2f ms | TOTAL: %.2f ms"),
 		xChunk, yChunk,
