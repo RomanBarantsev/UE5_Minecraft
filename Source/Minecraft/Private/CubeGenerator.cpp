@@ -31,18 +31,29 @@ void ACubeGenerator::LoadLayers()
 {
 	CavesRoomParams.rowName="CavesRoom";
 	CavesTunnelParams.rowName="CavesTunnel";
+	
 	SurfaceParams.rowName="Surface";
-	ContParams.rowName="Continentalness";
+	ContParams.rowName="Continentalness";	
+	PeakParams.rowName="Peak";
+	
 	BedrockParams.rowName="Bedrock";
+	
 	LoadNoiseParams(CavesRoomNoise,CavesRoomParams);
 	LoadNoiseParams(CavesTunnelNoise,CavesTunnelParams);
+	
 	LoadNoiseParams(SurfaceNoise,SurfaceParams);
 	LoadNoiseParams(ContNoise,ContParams);
+	LoadNoiseParams(PeakNoise,PeakParams);
+	
 	LoadNoiseParams(BedrockNoise,BedrockParams);
+	
 	SetNoiseParams(CavesRoomNoise,CavesRoomParams, FastNoiseLite::NoiseType_Perlin);
 	SetNoiseParams(CavesTunnelNoise,CavesTunnelParams, FastNoiseLite::NoiseType_Perlin);	
+	
 	SetNoiseParams(SurfaceNoise,SurfaceParams, FastNoiseLite::NoiseType_Perlin);	
-	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);	
+	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);
+	SetNoiseParams(PeakNoise,PeakParams, FastNoiseLite::NoiseType_Perlin);
+	
 	SetNoiseParams(BedrockNoise,BedrockParams, FastNoiseLite::NoiseType_Perlin);	
 }
 
@@ -81,26 +92,25 @@ float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 	return 1.0f - t * t; // плавно затухает к поверхности
 }
 
-int ACubeGenerator::mapHeight(double n,int x,int y)
+int ACubeGenerator::mapHeight(int x, int y)
 {
-	static int staticCont=0;
-	double norm = (n + 1.0) * 0.5;
-	int h = FMath::FloorToInt(floor(MIN_HEIGHT + norm * (MAX_HEIGHT - MIN_HEIGHT)));
-	if (h < 1) h = 1;
-	if (h >= CHUNK_Z-1) h = CHUNK_Z-2;
-	
-	float cont = ContNoise.GetNoise((float)x, (float)y);
-	cont=(cont + 1.0) * 0.5;
-	int contH=0;
-	float Y=0;
-	if (ContinentalnessCurve)
-	{
-		Y = ContinentalnessCurve->GetFloatValue(cont);
-	}
-	contH=static_cast<int>(Y);	
-	int finalHeight = (int)(contH+h);
-	//finalHeight = FMath::Clamp(finalHeight, 1, CHUNK_Z - 2);
-	return finalHeight;
+	float cont = ContNoise.GetNoise((float)x, (float)y);     // [-1..1]
+	float surf = SurfaceNoise.GetNoise((float)x, (float)y);
+	float peaks = PeakNoise.GetNoise((float)x, (float)y);
+
+	cont = (cont + 1) * 0.5f;
+	surf = (surf + 1) * 0.5f;
+	peaks = fabs(peaks);
+
+	float baseHeight = FMath::Lerp(50.f, 85.f, cont);
+
+	float mountain = pow(peaks, 1.6f) * 45.f;
+
+	float detail = (surf - 0.5f) * 10.f;
+
+	float height = baseHeight + mountain + detail;
+
+	return FMath::Clamp((int)height, 1, CHUNK_Z - 2);
 }
 
 void ACubeGenerator::CavesCreate(UChunk* chunk,int xChunk, int yChunk) //TODO объеденить с Fill
@@ -193,7 +203,7 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	{
 		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
 		{
-			NewChunk->SetSurfaceHeight(x,y,mapHeight(SurfaceNoise.GetNoise((float)xPerlin,(float)yPerlin),xPerlin,yPerlin));
+			NewChunk->SetSurfaceHeight(x,y,mapHeight(xPerlin,yPerlin));
 		}
 	}	
 	NewChunk->Fill();

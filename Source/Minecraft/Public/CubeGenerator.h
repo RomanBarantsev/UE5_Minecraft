@@ -56,11 +56,13 @@ protected:
 	FastNoiseLite CavesTunnelNoise;
 	FastNoiseLite SurfaceNoise;
 	FastNoiseLite ContNoise;
+	FastNoiseLite PeakNoise;
 	FastNoiseLite BedrockNoise;
 	FNoisesParams CavesRoomParams;
 	FNoisesParams CavesTunnelParams;
 	FNoisesParams SurfaceParams;
 	FNoisesParams ContParams;
+	FNoisesParams PeakParams;
 	FNoisesParams BedrockParams;
 	
 	UPROPERTY(EditAnywhere)
@@ -85,7 +87,7 @@ private:
 	virtual void Tick(float DeltaTime) override;
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	float GetHeightMask(int z, int minZ, int maxZ);
-	int mapHeight(double n,int x,int y);
+	int mapHeight(int x, int y);
 	void CavesCreate(UChunk* chunk,int xChunk, int yChunk);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
