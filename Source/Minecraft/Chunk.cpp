@@ -11,6 +11,11 @@ void UChunk::SetSurfaceHeight(int x, int y, int height)
 	Surface[SurfaceIndex(x,y)] = height;
 }
 
+int UChunk::GetSurfaceHeight(int x, int y) const
+{
+	return Surface[SurfaceIndex(x,y)];
+}
+
 void UChunk::Fill()
 {
 	for (int x = 0; x < CHUNK_X; x++)

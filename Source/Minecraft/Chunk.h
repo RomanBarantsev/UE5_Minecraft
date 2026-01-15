@@ -28,6 +28,9 @@ enum BlockType : uint8
 
 constexpr int BLOCK_SIZE = 256;
 
+constexpr int BEDROCK_BASE = 0;
+constexpr int BEDROCK_HEIGHT = 5;
+
 constexpr int CHUNK_X = 64;
 constexpr int CHUNK_Y = 64;
 constexpr int CHUNK_Z = 256;
@@ -72,5 +75,6 @@ public:
 	}
 
 	void SetSurfaceHeight(int x, int y, int height);
+	int GetSurfaceHeight(int x, int y) const;
 	void Fill();
 };
