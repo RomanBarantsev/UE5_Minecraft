@@ -27,19 +27,30 @@ ACubeGenerator::ACubeGenerator()
 	
 }
 
+void ACubeGenerator::LoadLayers()
+{
+	CavesRoomParams.rowName="CavesRoom";
+	CavesTunnelParams.rowName="CavesTunnel";
+	SurfaceParams.rowName="Surface";
+	ContParams.rowName="Continentalness";
+	BedrockParams.rowName="Bedrock";
+	LoadNoiseParams(CavesRoomNoise,CavesRoomParams);
+	LoadNoiseParams(CavesTunnelNoise,CavesTunnelParams);
+	LoadNoiseParams(SurfaceNoise,SurfaceParams);
+	LoadNoiseParams(ContNoise,ContParams);
+	LoadNoiseParams(BedrockNoise,BedrockParams);
+	SetNoiseParams(CavesRoomNoise,CavesRoomParams, FastNoiseLite::NoiseType_Perlin);
+	SetNoiseParams(CavesTunnelNoise,CavesTunnelParams, FastNoiseLite::NoiseType_Perlin);	
+	SetNoiseParams(SurfaceNoise,SurfaceParams, FastNoiseLite::NoiseType_Perlin);	
+	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);	
+	SetNoiseParams(BedrockNoise,BedrockParams, FastNoiseLite::NoiseType_Perlin);	
+}
+
 // Called when the game starts or when spawned
 void ACubeGenerator::BeginPlay()
 {
-	Super::BeginPlay();	
-	CavesParams.rowName="Caves";
-	SurfaceParams.rowName="Surface";
-	ContParams.rowName="Continentalness";
-	LoadNoiseParams(CavesNoise,CavesParams);
-	LoadNoiseParams(SurfaceNoise,SurfaceParams);
-	LoadNoiseParams(ContNoise,ContParams);
-	SetNoiseParams(CavesNoise,CavesParams, FastNoiseLite::NoiseType_Perlin);
-	SetNoiseParams(SurfaceNoise,SurfaceParams, FastNoiseLite::NoiseType_Perlin);	
-	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);	
+	Super::BeginPlay();
+	LoadLayers();
 	//time start
 	ChunksInit();
 	//time end
@@ -59,6 +70,15 @@ void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,Fa
 	Noise.SetFractalGain(params.Persistence);   // Затухание амплитуды (Persistence)
 	Noise.SetFractalLacunarity(params.Lacunarity); // Рост частоты (Lacunarity)
 	Noise.SetNoiseType(noiseType); // Тип шума — Perlin
+	Noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+}
+
+float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
+{
+	if (z <= minZ || z >= maxZ) return 0.0f;
+
+	float t = float(z - minZ) / float(maxZ - minZ);
+	return 1.0f - t * t; // плавно затухает к поверхности
 }
 
 int ACubeGenerator::mapHeight(double n,int x,int y)
@@ -91,10 +111,24 @@ void ACubeGenerator::CavesCreate(UChunk* chunk,int xChunk, int yChunk) //TODO о
 	{
 		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
 		{
+			float bedrockNoise = BedrockNoise.GetNoise((float)xPerlin,(float)yPerlin);
+			int bedrockTop = BEDROCK_BASE + (int)((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT);
 			for (int z = 0; z < CHUNK_Z; ++z)
 			{	
-				float density = CavesNoise.GetNoise((float)xPerlin, (float)yPerlin, (float)z);
-				if (density > -0.0f) {
+				if (z<bedrockTop || z==0)
+				{				
+					chunk->SetBlock(x, y, z, BlockType::Cobblestone);
+					continue;
+				}
+				float room = CavesRoomNoise.GetNoise((float)xPerlin, (float)yPerlin, (float)z);
+				float tunnel  = CavesTunnelNoise.GetNoise((float)xPerlin, (float)yPerlin, (float)z);
+				float mask = GetHeightMask(z, 1, chunk->GetSurfaceHeight(x,y) - 6);
+				float density =
+					tunnel * 1.2f +     // тоннели важнее
+					room * 0.8f;        // залы реже
+				density *= mask;
+				if (density > 0.25f)
+				{
 					chunk->SetBlock(x, y, z, BlockType::Air);
 				}
 			}
@@ -130,8 +164,11 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 }
 
 void ACubeGenerator::ChunksInit()
-{	
-	 
+{
+	for (auto mesh : MeshesMap)
+	{
+		mesh.Value->ClearAllMeshSections();
+	} 
 	for (int x = 0; x < 5; x++)
 	{
 		for (int y = 0; y < 5; y++)
@@ -195,3 +232,8 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 	);
 }
 
+void ACubeGenerator::Draw()
+{
+	LoadLayers();
+	ChunksInit();
+}

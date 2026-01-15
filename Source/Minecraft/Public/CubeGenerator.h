@@ -47,16 +47,21 @@ public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();
 protected:
+	void LoadLayers();
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	const int CubeSpacing = 0;
 	
-	FastNoiseLite CavesNoise;
+	FastNoiseLite CavesRoomNoise;
+	FastNoiseLite CavesTunnelNoise;
 	FastNoiseLite SurfaceNoise;
 	FastNoiseLite ContNoise;
-	FNoisesParams CavesParams;
+	FastNoiseLite BedrockNoise;
+	FNoisesParams CavesRoomParams;
+	FNoisesParams CavesTunnelParams;
 	FNoisesParams SurfaceParams;
 	FNoisesParams ContParams;
+	FNoisesParams BedrockParams;
 	
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
@@ -79,6 +84,7 @@ private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
+	float GetHeightMask(int z, int minZ, int maxZ);
 	int mapHeight(double n,int x,int y);
 	void CavesCreate(UChunk* chunk,int xChunk, int yChunk);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
@@ -87,5 +93,5 @@ private:
 public:
 	void RemoveBlock(int64 Index, FVector hit);
 	void NewChunk(int xChunk, int yChunk);
-	
+	void Draw();
 };
