@@ -3,6 +3,7 @@
 
 #include "CubeGenerator.h"
 #include "GreedyMeshing.h"
+#include "GeometryCollection/GeometryCollectionActor.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
@@ -11,16 +12,7 @@ class UProceduralMeshComponent;
 
 ACubeGenerator::ACubeGenerator()
 {
-	PrimaryActorTick.bCanEverTick = false;
-	static ConstructorHelpers::FObjectFinder<UDataTable> DataTableRef(TEXT("DataTable'/Game/PerlinNoiseDataTable.PerlinNoiseDataTable'"));
-	if (DataTableRef.Succeeded())
-	{
-		PerlinNoiseTable = DataTableRef.Object;
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to load DataTable: /Game/PerlinNoiseDataTable.PerlinNoiseDataTable"));
-	}	
+	PrimaryActorTick.bCanEverTick = false;	
 	// Создаём корневой компонент
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
@@ -201,6 +193,12 @@ void ACubeGenerator::RemoveBlock(FVector hit, UMinecraftProceduralMeshComponent*
 	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
 	GM->BuildGreedyMesh(Chunk);
 	GM->CreateMesh(*mesh,Mat,0);
+	
+	UE_LOG(LogTemp, Log, TEXT("loc: x=%f, y=%f, z=%f"),mesh->GetComponentLocation().X,mesh->GetComponentLocation().Y,mesh->GetComponentLocation().Z);
+	FVector Location = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
+	UE_LOG(LogTemp, Log, TEXT("loc: x=%f, y=%f, z=%f"),Location.X,Location.Y,Location.Z);
+	FActorSpawnParameters spawnParams;
+	GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,Location,FRotator::ZeroRotator,spawnParams);
 }
 
 void ACubeGenerator::NewChunk(int xChunk, int yChunk)

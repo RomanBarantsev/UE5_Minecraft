@@ -573,6 +573,17 @@ FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	TArray<FProcMeshTangent>(),
 	true
 );
+	procMesh.SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	procMesh.SetCollisionObjectType(ECC_WorldDynamic);
+	procMesh.SetCollisionResponseToAllChannels(ECR_Block);
+
+	/*procMesh.SetSimulatePhysics(true);
+	procMesh.SetEnableGravity(true);
+	procMesh.ContainsPhysicsTriMeshData(true);
+	procMesh.RecreatePhysicsState();
+	procMesh.bUseComplexAsSimpleCollision = false;*/
+
+	
 	procMesh.SetIndex(Section);
 	procMesh.SetMaterial(Section, Mat);
 	Vertices.Reset();
