@@ -79,7 +79,8 @@ protected:
 	UPROPERTY()
 	TArray<UGreedyMeshing*> GreedyMeshings;
 	int64 Section=0;
-
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AActor> DestroyedBlockClass;
 private:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
