@@ -2,6 +2,8 @@
 
 
 #include "CubeGenerator.h"
+
+#include "BreakableCube.h"
 #include "GreedyMeshing.h"
 #include "GeometryCollection/GeometryCollectionActor.h"
 #include "Minecraft/FastNoiseLite.h"
@@ -188,6 +190,7 @@ void ACubeGenerator::RemoveBlock(FVector hit, UMinecraftProceduralMeshComponent*
 	int X = FMath::FloorToInt(hit.X / BLOCK_SIZE);
 	int Y = FMath::FloorToInt(hit.Y / BLOCK_SIZE);
 	int Z = FMath::FloorToInt(hit.Z / BLOCK_SIZE);
+	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
 	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
@@ -198,7 +201,13 @@ void ACubeGenerator::RemoveBlock(FVector hit, UMinecraftProceduralMeshComponent*
 	FVector Location = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	UE_LOG(LogTemp, Log, TEXT("loc: x=%f, y=%f, z=%f"),Location.X,Location.Y,Location.Z);
 	FActorSpawnParameters spawnParams;
-	GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,Location,FRotator::ZeroRotator,spawnParams);
+	//TODO make a pool
+	auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,Location,FRotator::ZeroRotator,spawnParams);
+	ABreakableCube* Cube = Cast<ABreakableCube>(Actor);
+	if (Cube)
+	{
+		Cube->FractureNow(CurrentBlockType);
+	}
 }
 
 void ACubeGenerator::NewChunk(int xChunk, int yChunk)

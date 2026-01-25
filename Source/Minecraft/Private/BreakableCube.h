@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "BreakableCube.generated.h"
 
+enum BlockType : uint8;
 class UGeometryCollectionComponent;
 class UGeometryCollection;
 class UProceduralMeshComponent;
@@ -17,13 +18,15 @@ public:
 	ABreakableCube();
 
 protected:
-	void FractureNow();
 	virtual void BeginPlay() override;
-public:
+public:		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Destruction")
 	UGeometryCollectionComponent * GeometryCollectionComponent;
+	void FractureNow(BlockType type);
+	void Reset();
 private:
-	
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* AtlasMaterial;
 	UPROPERTY(VisibleAnywhere)
 	UPrimitiveComponent* RootPrim;
 };

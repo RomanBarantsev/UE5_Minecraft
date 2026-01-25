@@ -6,9 +6,9 @@
 ABreakableCube::ABreakableCube()
 {
     PrimaryActorTick.bCanEverTick = false;
-    RootPrim = Cast<UPrimitiveComponent>(GetRootComponent());
     GeometryCollectionComponent = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("GeometryCollection"));
-    GeometryCollectionComponent->SetupAttachment(RootPrim);
+    SetRootComponent(GeometryCollectionComponent);
+    RootPrim = Cast<UPrimitiveComponent>(GetRootComponent());
     if (!RootPrim)
     {
         UE_LOG(LogTemp, Error, TEXT("[BreakableCube] Root is NOT UPrimitiveComponent!"));
@@ -16,13 +16,28 @@ ABreakableCube::ABreakableCube()
     }
 }
 
-void ABreakableCube::FractureNow()
+void ABreakableCube::FractureNow(BlockType type)
 {
-    
+    if (GeometryCollectionComponent)
+    {
+        auto Material = GeometryCollectionComponent->GetMaterial(0);
+        if (Material)
+        {
+            if (auto DynamicMaterial = GeometryCollectionComponent->CreateAndSetMaterialInstanceDynamic(0))
+            {
+                // Устанавливаем индекс тайла для этого экземпляра
+                DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); // Пример значения
+            }
+        }
+    }
+}
+
+void ABreakableCube::Reset()
+{
+   
 }
 
 void ABreakableCube::BeginPlay()
 {
     Super::BeginPlay();
-    FractureNow();    
 }

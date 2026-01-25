@@ -7,23 +7,23 @@
 enum BlockType : uint8
 {
 	Empty = 0,
-	Air,
-	Grass,
-	Dirt,
-	Stone,
-	Wood,
-	Leaves,
-	Sand,
-	Gravel,
-	Cobblestone,
-	Bricks,
-	Glass,
-	Water,
-	Lava,
-	Bedrock,
-	IronBlock,
-	GoldBlock,
-	Count
+	Air = 1,
+	Grass = 2,
+	Dirt = 3,
+	Stone = 4,
+	Wood = 5,
+	Leaves = 6,
+	Sand = 7,
+	Gravel = 8,
+	Cobblestone = 9,
+	Bricks= 10,
+	Glass = 11,
+	Water = 12,
+	Lava = 13,
+	Bedrock = 14,
+	IronBlock = 15,
+	GoldBlock = 16,
+	Count = 16
 };
 
 constexpr int BLOCK_SIZE = 256;

@@ -37,30 +37,7 @@ void UGreedyMeshing::BuildGreedyMesh(const UChunk* ch)
 
 float UGreedyMeshing::GetTileIndex(BlockType Type)
 {
-	// Предполагая что BlockType начинается с:
-	// Empty=0, Air=1, Grass=2, Dirt=3, Stone=4, ...
-	switch (Type)
-	{
-	case BlockType::Grass:        return 0.0f;  // (0,0) - первая текстура в атласе
-	case BlockType::Dirt:         return 1.0f;  // (1,0)
-	case BlockType::Stone:        return 2.0f;  // (2,0)
-	case BlockType::Wood:         return 3.0f;  // (3,0)
-	case BlockType::Leaves:       return 4.0f;  // (0,1) - вторая строка
-	case BlockType::Sand:         return 5.0f;  // (1,1)
-	case BlockType::Gravel:       return 6.0f;  // (2,1)
-	case BlockType::Cobblestone:  return 7.0f;  // (3,1)
-	case BlockType::Bricks:       return 8.0f;  // (0,2)
-	case BlockType::Glass:        return 9.0f;  // (1,2)
-	case BlockType::Water:        return 10.0f; // (2,2)
-	case BlockType::Lava:         return 11.0f; // (3,2)
-	case BlockType::Bedrock:      return 12.0f; // (0,3)
-	case BlockType::IronBlock:    return 13.0f; // (1,3)
-	case BlockType::GoldBlock:    return 14.0f; // (2,3)
-	case BlockType::Empty:
-	case BlockType::Air:
-	default:
-		return 0.0f;  // Grass по умолчанию для воздуха/пустоты
-	}
+	return (float)Type;
 }
 
 void UGreedyMeshing::GreedyZPos(bool bPositive)
