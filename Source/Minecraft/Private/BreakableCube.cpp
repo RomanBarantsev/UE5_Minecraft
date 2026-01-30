@@ -27,6 +27,11 @@ void ABreakableCube::FractureNow(BlockType type)
             {
                 // Устанавливаем индекс тайла для этого экземпляра
                 DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); // Пример значения
+            } 
+            if (auto DynamicMaterial = GeometryCollectionComponent->CreateAndSetMaterialInstanceDynamic(1))
+            {
+                // Устанавливаем индекс тайла для этого экземпляра
+                DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); // Пример значения
             }
         }
     }
