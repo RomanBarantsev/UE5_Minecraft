@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
@@ -18,7 +20,7 @@ struct FPerlinNoiseBiom : public FTableRowBase
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
-	float Scale;
+	float Scale=0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
 	float Octaves;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
@@ -39,10 +41,27 @@ public:
 	FName rowName;
 };
 
+struct ChunkCoord
+{
+	int x;
+	int y;
+	bool operator==(const ChunkCoord& rhs) const
+	{
+		return x == rhs.x && y == rhs.y;
+	}
+	bool operator<(const ChunkCoord& rhs) const
+	{
+		if (x != rhs.x) return x < rhs.x;
+		return y < rhs.y;
+	}
+};
+
 UCLASS()
 class MINECRAFT_API ACubeGenerator : public AActor
 {
 	GENERATED_BODY()
+private:
+	int START_CHUNKS = 2;
 public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();
@@ -91,7 +110,9 @@ private:
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
 	void ChunksInit();
+	std::map<ChunkCoord,UChunk*> Chunks;
 public:
+	int GetSurfaceHigh(FVector vec);
 	void RemoveBlock(FVector hit,UMinecraftProceduralMeshComponent* mesh);
 	void NewChunk(int xChunk, int yChunk);
 	void Draw();

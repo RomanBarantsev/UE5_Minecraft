@@ -42,6 +42,7 @@ private:
 	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 	void GreedyXPos(bool bPositive);
 	void AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
+	void Tailing(float baseU, float baseV, int w, int h, bool bPositive);
 	void GreedyYPos(bool bPositive);
 	UPROPERTY()
 	const UChunk* Chunk;

@@ -167,15 +167,26 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 	return (density > threshold) ? 1 : 0;
 }
 
+int ACubeGenerator::GetSurfaceHigh(FVector vec)
+{
+	int XChunkCoord = FMath::FloorToInt(vec.X / BLOCK_SIZE);
+	int YChunkCoord = FMath::FloorToInt(vec.Y / BLOCK_SIZE);
+	int XChunk = XChunkCoord/CHUNKSIZE_WIDE;
+	int YChunk = YChunkCoord/CHUNKSIZE_WIDE;
+	ChunkCoord Coord{XChunk,YChunk};
+	UChunk* chunk = Chunks[Coord];
+	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
+}
+
 void ACubeGenerator::ChunksInit()
 {
 	for (auto mesh : MeshesMap)
 	{
 		mesh.Key->ClearAllMeshSections();
 	} 
-	for (int x = 0; x < 5; x++)
+	for (int x = 0-START_CHUNKS; x < 0+START_CHUNKS; x++)
 	{
-		for (int y = 0; y < 5; y++)
+		for (int y = 0-START_CHUNKS; y < 0+START_CHUNKS; y++)
 		{
 			NewChunk(x,y);			
 			Section++;
@@ -214,6 +225,10 @@ void ACubeGenerator::NewChunk(int xChunk, int yChunk)
 {
 	double TStart = FPlatformTime::Seconds();
 	UChunk* NewChunk = NewObject<UChunk>();
+	ChunkCoord coord;
+	coord.x=xChunk;
+	coord.y=yChunk;
+	Chunks.emplace(coord,NewChunk) ;
 	double T1 = FPlatformTime::Seconds();
 	for (int xPerlin = xChunk*CHUNK_X, x =0; xPerlin <xChunk*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{

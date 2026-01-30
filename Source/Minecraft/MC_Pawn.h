@@ -21,7 +21,7 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
+	const float PawnSize = 500.0f;
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

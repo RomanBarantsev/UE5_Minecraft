@@ -340,7 +340,11 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
 	float baseV = tileY * TileSize;
 
 	// ---- UV0 : тайлинг (0..w, 0..h)
+	Tailing(baseU,baseV,w,h,bPositive);   
+}
 
+void UGreedyMeshing::Tailing(float baseU, float baseV, int w,int h, bool bPositive)
+{
 	if (bPositive)
 	{
 		UVs.Add({0, 0});
@@ -359,8 +363,7 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
 	// ---- UV1 : смещение тайла в атласе
 
 	for (int i = 0; i < 4; i++)
-		UV1s.Add({ baseU, baseV });
-   
+		UV1s.Add(FVector2D(baseU, baseV ));
 }
 
 void UGreedyMeshing::GreedyYPos(bool bPositive)

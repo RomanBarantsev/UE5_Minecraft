@@ -35,12 +35,20 @@ void AMC_Pawn::BeginPlay()
 	{
 		UE_LOG(LogTemp,Error,TEXT("CubeGenerator is nullptr"));
 	}
+	PlaceAboveSurface();
 }
 
 // Called every frame
 void AMC_Pawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+void AMC_Pawn::PlaceAboveSurface()
+{
+	auto height = CubeGenerator->GetSurfaceHigh(GetActorLocation());
+	SetActorLocation(GetActorLocation() + FVector(0,0,height*BLOCK_SIZE+PawnSize));
+	UE_LOG(LogTemp,Warning,TEXT("height %d"),height);
 }
 
 void AMC_Pawn::Fire()

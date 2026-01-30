@@ -41,7 +41,7 @@ constexpr int Y_STRIDE = CHUNK_Z;
 constexpr int X_STRIDE = CHUNK_Z * CHUNK_Y;
 
 constexpr int TOTAL_BLOCKS = CHUNK_X * CHUNK_Y * CHUNK_Z;
-
+constexpr float CHUNKSIZE_WIDE = BLOCK_SIZE*CHUNK_X;
 UCLASS()
 class MINECRAFT_API UChunk : public UObject
 {
