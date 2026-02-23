@@ -61,10 +61,18 @@ void ACubeGenerator::BeginPlay()
 	//time end
 }
 
+void ACubeGenerator::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+	
+}
+
 // Called every frame
 void ACubeGenerator::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
+	
 }
 
 void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
@@ -113,20 +121,23 @@ void ACubeGenerator::CavesCreate(UChunk* chunk,int xChunk, int yChunk) //TODO о
 	float  delimiter=0.01;
 	for (int xPerlin = xChunk*CHUNK_X, x =0; xPerlin <xChunk*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
+		float fx = (float)xPerlin;
 		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
 		{
-			float bedrockNoise = BedrockNoise.GetNoise((float)xPerlin,(float)yPerlin);
+			float fy = (float)xPerlin;
+			float bedrockNoise = BedrockNoise.GetNoise(fx,fy);
 			int bedrockTop = BEDROCK_BASE + (int)((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT);
-			for (int z = 0; z < CHUNK_Z; ++z)
+			int height = chunk->GetSurfaceHeight(x,y);
+			for (int z = 0; z < height; ++z)
 			{	
 				if (z<bedrockTop || z==0)
 				{				
 					chunk->SetBlock(x, y, z, BlockType::Cobblestone);
 					continue;
 				}
-				float room = CavesRoomNoise.GetNoise((float)xPerlin, (float)yPerlin, (float)z);
-				float tunnel  = CavesTunnelNoise.GetNoise((float)xPerlin, (float)yPerlin, (float)z);
-				float mask = GetHeightMask(z, 1, chunk->GetSurfaceHeight(x,y) - 6);
+				float room = CavesRoomNoise.GetNoise(fx, fy, (float)z);
+				float tunnel  = CavesTunnelNoise.GetNoise(fx, fy, (float)z);
+				float mask = GetHeightMask(z, 1, height - 6);
 				float density =
 					tunnel * 1.2f +     // тоннели важнее
 					room * 0.8f;        // залы реже
@@ -167,110 +178,196 @@ int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,
 	return (density > threshold) ? 1 : 0;
 }
 
+void ACubeGenerator::ChunkMeshesGenerator()
+{
+	FChunkCoord Coord;
+	if (ChunkGenerationQueue.Dequeue(Coord))
+	{
+		ChunkToProcMesh(Coord);
+	}
+}
+
+void ACubeGenerator::UpdateChunks(FVector coord)
+{	
+	double TStart = FPlatformTime::Seconds();
+	coord/=BLOCK_SIZE;
+	FChunkCoord chunkCoord;
+	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X);
+	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
+	UE_LOG(LogTemp, Warning, TEXT("chunkCoord x %d y %d"),chunkCoord.x,chunkCoord.y);
+	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDelimiter
+	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDelimiter
+											|| currentChunkPosition.startPos)
+	{
+		currentChunkPosition.startPos=false;
+		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDelimiter) * chunkDelimiter;
+		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDelimiter) * chunkDelimiter;
+		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);	
+		
+		for (auto& Pair : Chunks)
+		{
+			ChunkRemove(Pair.Key);
+		}
+		
+		for (int x  = chunkCoord.x-chunkDelimiter*2; x < chunkCoord.x+chunkDelimiter*2; ++x)
+		{
+			for (int y = chunkCoord.y-chunkDelimiter*2; y < chunkCoord.y+chunkDelimiter*2; ++y)
+			{				
+				NewChunk(x,y);
+				UE_LOG(LogTemp, Warning, TEXT("NewChunk x %d y %d"),x,y);
+			}
+		}
+		
+		Chunks = MoveTemp(NewChunks);
+		NewChunks.Empty();
+		for (auto chunk : Chunks)
+		{
+			ChunkGenerationQueue.Enqueue(chunk.Key);
+		}
+		GetWorld()->GetTimerManager().SetTimer(ChunkMeshesGenerationTimerHandle,this,&ThisClass::ChunkMeshesGenerator,0.01,true,false);
+		
+		UE_LOG(LogTemp,Warning, TEXT("FreeMeshes %d"),FreeMeshes.Num());
+		double T1 = FPlatformTime::Seconds();
+		UE_LOG(LogTemp, Warning,
+			TEXT("Chunks Init: %.2f ms"),
+			(T1-TStart)*1000
+		);
+	}
+	UE_LOG(LogTemp, Log, TEXT("%d, %d"),chunkCoord.x,chunkCoord.y);		
+}
+
 int ACubeGenerator::GetSurfaceHigh(FVector vec)
 {
 	int XChunkCoord = FMath::FloorToInt(vec.X / BLOCK_SIZE);
 	int YChunkCoord = FMath::FloorToInt(vec.Y / BLOCK_SIZE);
 	int XChunk = XChunkCoord/CHUNKSIZE_WIDE;
 	int YChunk = YChunkCoord/CHUNKSIZE_WIDE;
-	ChunkCoord Coord{XChunk,YChunk};
+	FChunkCoord Coord{XChunk,YChunk};
+	if (!Chunks.Contains(Coord))
+		return 0;
 	UChunk* chunk = Chunks[Coord];
+	if (chunk==nullptr)
+		return 0;
 	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
 }
 
 void ACubeGenerator::ChunksInit()
 {
-	for (auto mesh : MeshesMap)
-	{
-		mesh.Key->ClearAllMeshSections();
-	} 
-	for (int x = 0-START_CHUNKS; x < 0+START_CHUNKS; x++)
-	{
-		for (int y = 0-START_CHUNKS; y < 0+START_CHUNKS; y++)
-		{
-			NewChunk(x,y);			
-			Section++;
-		}
-	}	
+	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
 }
 
-void ACubeGenerator::RemoveBlock(FVector hit, UMinecraftProceduralMeshComponent* mesh)
+void ACubeGenerator::NewChunk(int xChunk, int yChunk)
+{	
+	FChunkCoord coord{xChunk, yChunk};
+	if (Chunks.Contains(coord))
+	{
+		NewChunks.Add(coord, Chunks[coord]);
+	}
+	else
+	{
+		NewChunks.Add(coord, nullptr);
+	}
+}
+
+void ACubeGenerator::ChunkRemove(FChunkCoord coord)
 {
-	UChunk* Chunk = MeshesMap[mesh];
-	UE_LOG(LogTemp,Display,TEXT("%d %d %d"),(int)hit.X/BLOCK_SIZE,(int)hit.Y/BLOCK_SIZE,(int)hit.Z/BLOCK_SIZE);
-	int X = FMath::FloorToInt(hit.X / BLOCK_SIZE);
-	int Y = FMath::FloorToInt(hit.Y / BLOCK_SIZE);
-	int Z = FMath::FloorToInt(hit.Z / BLOCK_SIZE);
+	UChunk* chunk = Chunks[coord];
+	UMinecraftProceduralMeshComponent* Mesh = MeshesMap[coord];
+	Mesh->ClearAllMeshSections();
+	ChunkMap.Remove(coord);
+	MeshesMap.Remove(coord);
+	FreeMeshes.Add(Mesh);
+	MeshToChunkMap.Remove(Mesh);
+}
+
+void ACubeGenerator::ChunkToProcMesh(const FChunkCoord& coord)
+{
+	UChunk* NewChunk = NewObject<UChunk>(this);
+	ChunkMap.Add(coord,NewChunk);
+	static float PerlinDelimiter = 0.1;
+	for (int xPerlin = coord.x*CHUNK_X, x =0; x<CHUNK_X; xPerlin++,x++) //
+	{
+		for (int yPerlin = coord.y*CHUNK_Y, y=0; y<CHUNK_Y; yPerlin++,y++)
+		{
+			NewChunk->SetSurfaceHeight(x,y,mapHeight(xPerlin,yPerlin));
+		}
+	}
+	if (!Chunks.Contains(coord))
+		return;
+	Chunks[coord]=NewChunk;
+	NewChunk->Fill();	
+	CavesCreate(NewChunk,coord.x,coord.y);
+	
+	UMinecraftProceduralMeshComponent* ProcMesh;
+	if (!FreeMeshes.IsEmpty())
+	{
+		ProcMesh =FreeMeshes.Last();
+		FreeMeshes.Pop();
+	}
+	else
+	{
+		ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
+		ProcMesh->RegisterComponent();
+		ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
+		ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	}
+	MeshToChunkMap.Add(ProcMesh,NewChunk);
+	
+	ProcMesh->SetRelativeLocation(FVector(coord.x*CHUNK_X*BLOCK_SIZE, coord.y*CHUNK_X*BLOCK_SIZE, 0));
+	MeshesMap.Add(coord,ProcMesh);
+	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
+	
+	TWeakObjectPtr<UChunk> WeakChunk = NewChunk;
+	TWeakObjectPtr<UMinecraftProceduralMeshComponent> WeakProcMesh = ProcMesh;
+	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
+	Async(EAsyncExecution::ThreadPool, [WeakChunk, WeakProcMesh, WeakThis, GM]()
+		{
+			if (!WeakChunk.IsValid())
+				return;
+			
+			GM->BuildGreedyMesh(WeakChunk.Get());
+			AsyncTask(ENamedThreads::GameThread, [WeakChunk, WeakProcMesh, WeakThis, GM]()
+			{
+				if (!WeakProcMesh.IsValid() || !WeakChunk.IsValid())
+					return;
+				GM->CreateMesh(*WeakProcMesh,WeakThis->Mat);
+			});
+		});
+	
+	
+}
+
+void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
+{
+	FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
+	FVector LocalPos =mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);
+	int X = FMath::FloorToInt(LocalPos.X / BLOCK_SIZE);
+	int Y = FMath::FloorToInt(LocalPos.Y / BLOCK_SIZE);
+	int Z = FMath::FloorToInt(LocalPos.Z / BLOCK_SIZE);
+	LocalPos/=BLOCK_SIZE;
+	
+	FChunkCoord chunkCoord;
+	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X);
+	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y);
+	UChunk* Chunk = MeshToChunkMap[mesh];
+	
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
 	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
 	GM->BuildGreedyMesh(Chunk);
-	GM->CreateMesh(*mesh,Mat,0);
-	
-	UE_LOG(LogTemp, Log, TEXT("loc: x=%f, y=%f, z=%f"),mesh->GetComponentLocation().X,mesh->GetComponentLocation().Y,mesh->GetComponentLocation().Z);
-	FVector Location = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
-	UE_LOG(LogTemp, Log, TEXT("loc: x=%f, y=%f, z=%f"),Location.X,Location.Y,Location.Z);
+	GM->CreateMesh(*mesh,Mat);	
+	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	FActorSpawnParameters spawnParams;
 	//TODO make a pool
-	auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,Location,FRotator::ZeroRotator,spawnParams);
+	auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,CubeLocation,FRotator::ZeroRotator,spawnParams);
 	ABreakableCube* Cube = Cast<ABreakableCube>(Actor);
 	if (Cube)
 	{
-		Cube->FractureNow(CurrentBlockType);
+		Cube->FractureNow(CurrentBlockType,Hit);
 	}
 }
 
-void ACubeGenerator::NewChunk(int xChunk, int yChunk)
-{
-	double TStart = FPlatformTime::Seconds();
-	UChunk* NewChunk = NewObject<UChunk>();
-	ChunkCoord coord;
-	coord.x=xChunk;
-	coord.y=yChunk;
-	Chunks.emplace(coord,NewChunk) ;
-	double T1 = FPlatformTime::Seconds();
-	for (int xPerlin = xChunk*CHUNK_X, x =0; xPerlin <xChunk*CHUNK_X+CHUNK_X; xPerlin++,x++)
-	{
-		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
-		{
-			NewChunk->SetSurfaceHeight(x,y,mapHeight(xPerlin,yPerlin));
-		}
-	}	
-	NewChunk->Fill();
-	CavesCreate(NewChunk,xChunk,yChunk);
-	
-	double T2 = FPlatformTime::Seconds();
-
-	UMinecraftProceduralMeshComponent* ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
-	ProcMesh->RegisterComponent();
-	ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
-	ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	ProcMesh->SetRelativeLocation(FVector(xChunk*CHUNK_X*BLOCK_SIZE, yChunk*CHUNK_X*BLOCK_SIZE, 0));
-	MeshesMap.Add(ProcMesh,NewChunk);
-	
-	double T3 = FPlatformTime::Seconds();
-	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
-	Async(EAsyncExecution::ThreadPool, [=]()
-		{			
-			GM->BuildGreedyMesh(NewChunk);
-			AsyncTask(ENamedThreads::GameThread, [=]()
-			{				
-				GM->CreateMesh(*ProcMesh,Mat,0);
-			});
-		});
-	double T4 = FPlatformTime::Seconds();
-	//GreedyMeshings.Add(GM);
-	UE_LOG(LogTemp, Warning,
-		TEXT("Chunk[%d,%d] Init: %.2f ms | Terrain: %.2f ms | Meshing: %.2f ms | MeshApply: %.2f ms | TOTAL: %.2f ms"),
-		xChunk, yChunk,
-		(T1-TStart)*1000,
-		(T2-T1)*1000,
-		(T3-T2)*1000,
-		(T4-T3)*1000,
-		(T4-TStart)*1000
-	);
-}
 
 void ACubeGenerator::Draw()
 {

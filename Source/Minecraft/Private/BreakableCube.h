@@ -22,7 +22,7 @@ protected:
 public:		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Destruction")
 	UGeometryCollectionComponent * GeometryCollectionComponent;
-	void FractureNow(BlockType type);
+	void FractureNow(BlockType type, FHitResult hit);
 	void Reset();
 private:
 	UPROPERTY(EditAnywhere)

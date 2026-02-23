@@ -24,8 +24,8 @@ void AMC_Pawn::BeginPlay()
 	Super::BeginPlay();	
 	if (UFloatingPawnMovement* Move = FindComponentByClass<UFloatingPawnMovement>())
 	{
-		Move->MaxSpeed = 600000.f;        // было ~1200
-		Move->Acceleration = 120000.f;   // быстрее разгон
+		Move->MaxSpeed = 600000.f;       
+		Move->Acceleration = 120000.f;   
 		Move->Deceleration = 120000.f;
 	}
 	TArray<AActor*> OutActors;
@@ -35,7 +35,16 @@ void AMC_Pawn::BeginPlay()
 	{
 		UE_LOG(LogTemp,Error,TEXT("CubeGenerator is nullptr"));
 	}
-	PlaceAboveSurface();
+	//PlaceAboveSurface();
+	GetWorld()->GetTimerManager().SetTimer(WorldUpdateTimerHandle,this,&AMC_Pawn::WorldUpdate,2.0f,true,0);
+}
+
+void AMC_Pawn::WorldUpdate()
+{
+	if (CubeGenerator)
+	{
+	CubeGenerator->UpdateChunks(GetActorLocation());		
+	}
 }
 
 // Called every frame
@@ -61,12 +70,7 @@ void AMC_Pawn::Fire()
 	{
 		auto Mesh = Cast<UMinecraftProceduralMeshComponent>(Hit.GetComponent());
 		if (!Mesh) return;
-
-		constexpr float EPS = 0.1f;
-
-		FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
-		FVector LocalPos =Mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);
-		CubeGenerator->RemoveBlock(LocalPos, Mesh);
+		CubeGenerator->RemoveBlock(Hit, Mesh);
 	}		
 }
 

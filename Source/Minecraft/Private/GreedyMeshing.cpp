@@ -538,10 +538,10 @@ void UGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive,
  
 }
 
-FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat, const int64& Section)
+FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat)
 {
 	procMesh.CreateMeshSection(
-	Section,
+	0,
 	Vertices,
 	Triangles,
 	Normals,
@@ -564,8 +564,8 @@ FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	procMesh.bUseComplexAsSimpleCollision = false;*/
 
 	
-	procMesh.SetIndex(Section);
-	procMesh.SetMaterial(Section, Mat);
+	procMesh.SetIndex(0);
+	procMesh.SetMaterial(0, Mat);
 	Vertices.Reset();
 	Triangles.Reset();
 	Normals.Reset();

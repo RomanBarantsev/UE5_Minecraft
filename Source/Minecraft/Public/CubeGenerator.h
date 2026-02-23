@@ -40,21 +40,32 @@ public:
 	float Lacunarity;
 	FName rowName;
 };
+USTRUCT(BlueprintType)
 
-struct ChunkCoord
+struct FChunkCoord
 {
+	GENERATED_BODY()
 	int x;
 	int y;
-	bool operator==(const ChunkCoord& rhs) const
+	bool startPos=true;
+	bool operator==(const FChunkCoord& rhs) const
 	{
 		return x == rhs.x && y == rhs.y;
 	}
-	bool operator<(const ChunkCoord& rhs) const
+	bool operator<(const FChunkCoord& rhs) const
 	{
 		if (x != rhs.x) return x < rhs.x;
 		return y < rhs.y;
 	}
 };
+
+FORCEINLINE uint32 GetTypeHash(const FChunkCoord& Key)
+{
+	// Простой способ: скомбинировать хеши полей
+	uint32 Hash = GetTypeHash(Key.x);
+	Hash = HashCombine(Hash, GetTypeHash(Key.y));
+	return Hash;
+}
 
 UCLASS()
 class MINECRAFT_API ACubeGenerator : public AActor
@@ -62,6 +73,8 @@ class MINECRAFT_API ACubeGenerator : public AActor
 	GENERATED_BODY()
 private:
 	int START_CHUNKS = 2;
+	const int chunkDelimiter=2;
+
 public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();
@@ -69,6 +82,7 @@ protected:
 	void LoadLayers();
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	const int CubeSpacing = 0;
 	
 	FastNoiseLite CavesRoomNoise;
@@ -94,10 +108,13 @@ protected:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
 	UPROPERTY()
-	TMap<UMinecraftProceduralMeshComponent*,UChunk*> MeshesMap;
+	TMap<FChunkCoord,UChunk*> ChunkMap;
+	UPROPERTY()
+	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
+	UPROPERTY()
+	TArray<UMinecraftProceduralMeshComponent*> FreeMeshes;
 	UPROPERTY()
 	TArray<UGreedyMeshing*> GreedyMeshings;
-	int64 Section=0;
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> DestroyedBlockClass;
 private:
@@ -110,10 +127,28 @@ private:
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
 	void ChunksInit();
-	std::map<ChunkCoord,UChunk*> Chunks;
+	void ChunkRemove(FChunkCoord coord);
+	void ChunkToProcMesh(const FChunkCoord& coord);
+	UPROPERTY()
+	TMap<FChunkCoord,UChunk*> Chunks;
+	UPROPERTY()
+	TMap<FChunkCoord,UChunk*>NewChunks;
+	UPROPERTY()
+	TMap<UMinecraftProceduralMeshComponent*,UChunk*> MeshToChunkMap;
+	FChunkCoord currentChunkPosition;
+	
+	TQueue<FChunkCoord> ChunkGenerationQueue;
+	bool bIsGeneratingChunk = false;
+public:
+	UFUNCTION()
+	void UpdateChunks(FVector coord);
+private:
+	FTimerHandle ChunkMeshesGenerationTimerHandle;
+	void ChunkMeshesGenerator();
 public:
 	int GetSurfaceHigh(FVector vec);
-	void RemoveBlock(FVector hit,UMinecraftProceduralMeshComponent* mesh);
+	void RemoveBlock(FHitResult hit,UMinecraftProceduralMeshComponent* mesh);
+	float EPS = 0.1f;	
 	void NewChunk(int xChunk, int yChunk);
 	void Draw();
 };

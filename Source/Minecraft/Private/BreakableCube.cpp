@@ -1,7 +1,9 @@
 ﻿#include "BreakableCube.h"
 #include "Components/PrimitiveComponent.h"
+#include "Field/FieldSystemObjects.h"
 #include "GameFramework/Actor.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
+#include "GeometryCollection/GeometryCollectionSimulationTypes.h"
 
 ABreakableCube::ABreakableCube()
 {
@@ -16,7 +18,7 @@ ABreakableCube::ABreakableCube()
     }
 }
 
-void ABreakableCube::FractureNow(BlockType type)
+void ABreakableCube::FractureNow(BlockType type, FHitResult hit)
 {
     if (GeometryCollectionComponent)
     {
@@ -34,7 +36,23 @@ void ABreakableCube::FractureNow(BlockType type)
                 DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); // Пример значения
             }
         }
-    }
+        
+        FVector ViewLocation;
+        FRotator ViewRotation;
+
+        GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
+            ViewLocation,
+            ViewRotation
+        );
+
+        FVector ViewDir = ViewRotation.Vector();
+        /*GeometryCollectionComponent->ApplyPhysicsField(true,EGeometryCollectionPhysicsTypeEnum::Chaos_ExternalClusterStrain,nullptr,
+     MakeShared<FRadialFalloff>(5000.f,0.f,1.f,0.f,300.f,hit.ImpactPoint,EFieldFalloffType::Field_Falloff_Linear));
+
+        // Толкаем все куски
+        GeometryCollectionComponent->ApplyPhysicsField(true,EGeometryCollectionPhysicsTypeEnum::Chaos_LinearVelocity,nullptr,
+            MakeShared<FUniformVector>(ViewDir * 3000.f));*/
+    }    
 }
 
 void ABreakableCube::Reset()
