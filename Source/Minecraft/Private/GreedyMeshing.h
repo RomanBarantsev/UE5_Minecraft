@@ -4,10 +4,11 @@
 
 #include <vector>
 #include "CoreMinimal.h"
-#include "Minecraft/Chunk.h"
 #include "UObject/Object.h"
 #include "GreedyMeshing.generated.h"
 
+struct FChunkBuildData;
+enum BlockType : uint8;
 class UMinecraftProceduralMeshComponent;
 class UProceduralMeshComponent;
 
@@ -44,10 +45,10 @@ private:
 	void AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 	void Tailing(float baseU, float baseV, int w, int h, bool bPositive);
 	void GreedyYPos(bool bPositive);
-	UPROPERTY()
-	const UChunk* Chunk;
+	const FChunkBuildData* Chunk;
 public:
-	void BuildGreedyMesh(const UChunk* ch);
+	void BuildGreedyMesh(const FChunkBuildData* Data);
+	void BuildMesh(const FChunkBuildData& Data);
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat);

@@ -1,22 +1,12 @@
-﻿#include "Chunk.h"
+﻿#include "FChunkBuildData.h"
 
-UChunk::UChunk()
+FChunkBuildData::FChunkBuildData()
 {
 	Blocks.resize(TOTAL_BLOCKS, BlockType::Empty);
-	Surface.resize(CHUNK_X * CHUNK_Y, 0);
+	SurfaceHeights.resize(CHUNK_X * CHUNK_Y, 0);
 }
 
-void UChunk::SetSurfaceHeight(int x, int y, int height)
-{
-	Surface[SurfaceIndex(x,y)] = height;
-}
-
-int UChunk::GetSurfaceHeight(int x, int y) const
-{
-	return Surface[SurfaceIndex(x,y)];
-}
-
-void UChunk::Fill()
+void FChunkBuildData::Fill()
 {
 	for (int x = 0; x < CHUNK_X; x++)
 	{
@@ -25,7 +15,7 @@ void UChunk::Fill()
 		for (int y = 0; y < CHUNK_Y; y++)
 		{
 			const int yOff = xOff + y * Y_STRIDE;
-			const int surface = Surface[SurfaceIndex(x,y)];
+			const int surface = SurfaceHeights[SurfaceIndex(x,y)];
 
 			for (int z = 0; z < CHUNK_Z; z++)
 			{
@@ -46,4 +36,14 @@ void UChunk::Fill()
 			}
 		}
 	}
+}
+
+int FChunkBuildData::GetSurfaceHeight(int x, int y) const
+{
+	return SurfaceHeights[SurfaceIndex(x,y)];
+}
+
+void FChunkBuildData::SetSurfaceHeight(int x, int y, int height)
+{
+	SurfaceHeights[SurfaceIndex(x,y)]=height;
 }

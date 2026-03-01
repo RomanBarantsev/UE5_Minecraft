@@ -1,8 +1,7 @@
 ﻿#pragma once
 #include <vector>
-#include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Chunk.generated.h"
+
+#include "CubeGenerator.h"
 
 enum BlockType : uint8
 {
@@ -42,38 +41,38 @@ constexpr int X_STRIDE = CHUNK_Z * CHUNK_Y;
 
 constexpr int TOTAL_BLOCKS = CHUNK_X * CHUNK_Y * CHUNK_Z;
 constexpr float CHUNKSIZE_WIDE = BLOCK_SIZE*CHUNK_X;
-UCLASS()
-class MINECRAFT_API UChunk : public UObject
-{
-	GENERATED_BODY()
 
+struct FChunkBuildData
+{
 private:
 	std::vector<uint8> Blocks;     // BlockType as uint8
-	std::vector<uint16> Surface;
+	std::vector<uint16> SurfaceHeights;
+
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	TArray<FVector2D> UVs;
+	TArray<FVector2D> UV1s;
+public:
+	FChunkCoord Coord;
+	FChunkBuildData();
 
 	FORCEINLINE int Index(int x, int y, int z) const
 	{
 		return z + y * Y_STRIDE + x * X_STRIDE;
 	}
-
 	FORCEINLINE int SurfaceIndex(int x, int y) const
 	{
 		return x + y * CHUNK_X;
 	}
-
-public:
-	UChunk();
-
-	FORCEINLINE void SetBlock(int x, int y, int z, BlockType type)
-	{
-		Blocks[Index(x,y,z)] = (uint8)type;
-	}
-
 	FORCEINLINE BlockType GetBlock(int x, int y, int z) const
 	{
 		return (BlockType)Blocks[Index(x,y,z)];
 	}
-
+	FORCEINLINE void SetBlock(int x, int y, int z, BlockType type)
+	{
+		Blocks[Index(x,y,z)] = (uint8)type;
+	}
 	void SetSurfaceHeight(int x, int y, int height);
 	int GetSurfaceHeight(int x, int y) const;
 	void Fill();

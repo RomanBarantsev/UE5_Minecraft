@@ -3,14 +3,15 @@
 #pragma once
 
 #include <map>
+#include <unordered_map>
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
-#include "Minecraft/Chunk.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "CubeGenerator.generated.h"
 
+struct FChunkBuildData;
 class UMinecraftProceduralMeshComponent;
 class UDataTable;
 class UGreedyMeshing;
@@ -29,6 +30,7 @@ struct FPerlinNoiseBiom : public FTableRowBase
 	float Lacunarity;
 };
 
+
 USTRUCT(BlueprintType)
 struct FNoisesParams
 {
@@ -40,8 +42,8 @@ public:
 	float Lacunarity;
 	FName rowName;
 };
-USTRUCT(BlueprintType)
 
+USTRUCT(BlueprintType)
 struct FChunkCoord
 {
 	GENERATED_BODY()
@@ -82,7 +84,6 @@ protected:
 	void LoadLayers();
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	const int CubeSpacing = 0;
 	
 	FastNoiseLite CavesRoomNoise;
@@ -107,8 +108,7 @@ protected:
 	UDataTable* PerlinNoiseTable;
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
-	UPROPERTY()
-	TMap<FChunkCoord,UChunk*> ChunkMap;
+	TMap<FChunkCoord,FChunkBuildData*> ChunkMap;
 	UPROPERTY()
 	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
 	UPROPERTY()
@@ -118,23 +118,18 @@ protected:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> DestroyedBlockClass;
 private:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	float GetHeightMask(int z, int minZ, int maxZ);
 	int mapHeight(int x, int y);
-	void CavesCreate(UChunk* chunk,int xChunk, int yChunk);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
-	int  NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold);
-	void ChunksInit();
 	void ChunkRemove(FChunkCoord coord);
 	void ChunkToProcMesh(const FChunkCoord& coord);
-	UPROPERTY()
-	TMap<FChunkCoord,UChunk*> Chunks;
-	UPROPERTY()
-	TMap<FChunkCoord,UChunk*>NewChunks;
-	UPROPERTY()
-	TMap<UMinecraftProceduralMeshComponent*,UChunk*> MeshToChunkMap;
+	void GenerateChunkData(FChunkBuildData& Data);
+	void GenerateBlocksAndCaves(FChunkBuildData& Data);
+	void FinalizeChunk(const FChunkBuildData& Data);
+	TMap<FChunkCoord,FChunkBuildData*> Chunks;
+	TMap<FChunkCoord,FChunkBuildData*>NewChunks;
+	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
 	FChunkCoord currentChunkPosition;
 	
 	TQueue<FChunkCoord> ChunkGenerationQueue;
@@ -142,13 +137,8 @@ private:
 public:
 	UFUNCTION()
 	void UpdateChunks(FVector coord);
-private:
-	FTimerHandle ChunkMeshesGenerationTimerHandle;
-	void ChunkMeshesGenerator();
 public:
 	int GetSurfaceHigh(FVector vec);
 	void RemoveBlock(FHitResult hit,UMinecraftProceduralMeshComponent* mesh);
 	float EPS = 0.1f;	
-	void NewChunk(int xChunk, int yChunk);
-	void Draw();
 };

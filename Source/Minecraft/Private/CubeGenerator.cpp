@@ -5,8 +5,8 @@
 
 #include "BreakableCube.h"
 #include "GreedyMeshing.h"
-#include "GeometryCollection/GeometryCollectionActor.h"
 #include "Minecraft/FastNoiseLite.h"
+#include "Minecraft/FChunkBuildData.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
 class UProceduralMeshComponent;
@@ -57,23 +57,10 @@ void ACubeGenerator::BeginPlay()
 	Super::BeginPlay();
 	LoadLayers();
 	//time start
-	ChunksInit();
+	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
 	//time end
 }
 
-void ACubeGenerator::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
-	
-}
-
-// Called every frame
-void ACubeGenerator::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-	
-	
-}
 
 void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
 {
@@ -115,41 +102,6 @@ int ACubeGenerator::mapHeight(int x, int y)
 	return FMath::Clamp((int)height, 1, CHUNK_Z - 2);
 }
 
-void ACubeGenerator::CavesCreate(UChunk* chunk,int xChunk, int yChunk) //TODO объеденить с Fill
-{	
-	
-	float  delimiter=0.01;
-	for (int xPerlin = xChunk*CHUNK_X, x =0; xPerlin <xChunk*CHUNK_X+CHUNK_X; xPerlin++,x++)
-	{
-		float fx = (float)xPerlin;
-		for (int yPerlin = yChunk*CHUNK_X, y=0; yPerlin <yChunk*CHUNK_X+CHUNK_X; yPerlin++,y++)
-		{
-			float fy = (float)xPerlin;
-			float bedrockNoise = BedrockNoise.GetNoise(fx,fy);
-			int bedrockTop = BEDROCK_BASE + (int)((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT);
-			int height = chunk->GetSurfaceHeight(x,y);
-			for (int z = 0; z < height; ++z)
-			{	
-				if (z<bedrockTop || z==0)
-				{				
-					chunk->SetBlock(x, y, z, BlockType::Cobblestone);
-					continue;
-				}
-				float room = CavesRoomNoise.GetNoise(fx, fy, (float)z);
-				float tunnel  = CavesTunnelNoise.GetNoise(fx, fy, (float)z);
-				float mask = GetHeightMask(z, 1, height - 6);
-				float density =
-					tunnel * 1.2f +     // тоннели важнее
-					room * 0.8f;        // залы реже
-				density *= mask;
-				if (density > 0.25f)
-				{
-					chunk->SetBlock(x, y, z, BlockType::Air);
-				}
-			}
-		}
-	}
-}
 
 void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params)
 {
@@ -163,29 +115,6 @@ void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params
 	}
 }
 
-int  ACubeGenerator::NormalizeNoise(float noise_value,int z,int z_min,int z_max,float threshold)
-{
-	float denom = static_cast<float>(z_max - z_min);
-	float y_norm = denom <= 0.0001f ? 0.0f : (z - z_min) / denom;
-	// base density: чем глубже — тем больше плотность
-	float base = (static_cast<float>(z_max) - static_cast<float>(z)) / static_cast<float>(z_max); // 0..1
-	// convert noise to 0..1
-	float n = (noise_value + 1.0f) * 0.5f;
-	// keep vertical influence but milder
-	float vertical_weight = 1.0f - fabs( (y_norm - 0.5f) * 2.0f ); // 1 in middle, 0 on edges
-	float cave_strength = 0.6f; // настроить
-	float density = base + (n - 0.5f) * cave_strength * vertical_weight;
-	return (density > threshold) ? 1 : 0;
-}
-
-void ACubeGenerator::ChunkMeshesGenerator()
-{
-	FChunkCoord Coord;
-	if (ChunkGenerationQueue.Dequeue(Coord))
-	{
-		ChunkToProcMesh(Coord);
-	}
-}
 
 void ACubeGenerator::UpdateChunks(FVector coord)
 {	
@@ -213,18 +142,16 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 		{
 			for (int y = chunkCoord.y-chunkDelimiter*2; y < chunkCoord.y+chunkDelimiter*2; ++y)
 			{				
-				NewChunk(x,y);
-				UE_LOG(LogTemp, Warning, TEXT("NewChunk x %d y %d"),x,y);
+				ChunkToProcMesh(FChunkCoord{x,y});
 			}
 		}
-		
+		//ChunkToProcMesh(FChunkCoord{0,0});
 		Chunks = MoveTemp(NewChunks);
 		NewChunks.Empty();
 		for (auto chunk : Chunks)
 		{
 			ChunkGenerationQueue.Enqueue(chunk.Key);
 		}
-		GetWorld()->GetTimerManager().SetTimer(ChunkMeshesGenerationTimerHandle,this,&ThisClass::ChunkMeshesGenerator,0.01,true,false);
 		
 		UE_LOG(LogTemp,Warning, TEXT("FreeMeshes %d"),FreeMeshes.Num());
 		double T1 = FPlatformTime::Seconds();
@@ -245,33 +172,14 @@ int ACubeGenerator::GetSurfaceHigh(FVector vec)
 	FChunkCoord Coord{XChunk,YChunk};
 	if (!Chunks.Contains(Coord))
 		return 0;
-	UChunk* chunk = Chunks[Coord];
+	FChunkBuildData* chunk = Chunks[Coord];
 	if (chunk==nullptr)
 		return 0;
 	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
 }
 
-void ACubeGenerator::ChunksInit()
-{
-	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
-}
-
-void ACubeGenerator::NewChunk(int xChunk, int yChunk)
-{	
-	FChunkCoord coord{xChunk, yChunk};
-	if (Chunks.Contains(coord))
-	{
-		NewChunks.Add(coord, Chunks[coord]);
-	}
-	else
-	{
-		NewChunks.Add(coord, nullptr);
-	}
-}
-
 void ACubeGenerator::ChunkRemove(FChunkCoord coord)
 {
-	UChunk* chunk = Chunks[coord];
 	UMinecraftProceduralMeshComponent* Mesh = MeshesMap[coord];
 	Mesh->ClearAllMeshSections();
 	ChunkMap.Remove(coord);
@@ -282,59 +190,98 @@ void ACubeGenerator::ChunkRemove(FChunkCoord coord)
 
 void ACubeGenerator::ChunkToProcMesh(const FChunkCoord& coord)
 {
-	UChunk* NewChunk = NewObject<UChunk>(this);
-	ChunkMap.Add(coord,NewChunk);
-	static float PerlinDelimiter = 0.1;
-	for (int xPerlin = coord.x*CHUNK_X, x =0; x<CHUNK_X; xPerlin++,x++) //
+	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
+	Async(EAsyncExecution::ThreadPool, [WeakThis,coord]()
 	{
-		for (int yPerlin = coord.y*CHUNK_Y, y=0; y<CHUNK_Y; yPerlin++,y++)
+		if (!WeakThis.IsValid())
+			return;
+		
+		UE_LOG(LogTemp, Warning, TEXT("NewChunk x %d y %d"),coord.x,coord.y);
+		FChunkBuildData BuildData;
+		BuildData.Coord = coord;
+		
+		WeakThis->GenerateChunkData(BuildData);
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, BuildData = MoveTemp(BuildData)]() mutable  
 		{
-			NewChunk->SetSurfaceHeight(x,y,mapHeight(xPerlin,yPerlin));
+			if (!WeakThis.IsValid())
+				return;			
+			WeakThis->Chunks.Add(BuildData.Coord, &BuildData);
+			WeakThis->FinalizeChunk(BuildData);
+		});	
+	});
+}
+
+void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
+{
+	for (int x = 0; x < CHUNK_X; x++)
+	{
+		for (int y = 0; y < CHUNK_Y; y++)
+		{			
+			int worldX = Data.Coord.x*CHUNK_X+x;
+			int worldY = Data.Coord.y*CHUNK_Y+y;
+			int height = mapHeight(worldX, worldY);
+			Data.SetSurfaceHeight(x,y,height);
 		}
 	}
-	if (!Chunks.Contains(coord))
-		return;
-	Chunks[coord]=NewChunk;
-	NewChunk->Fill();	
-	CavesCreate(NewChunk,coord.x,coord.y);
-	
-	UMinecraftProceduralMeshComponent* ProcMesh;
-	if (!FreeMeshes.IsEmpty())
+	Data.Fill();
+	//GenerateBlocksAndCaves(Data);
+}
+
+void ACubeGenerator::GenerateBlocksAndCaves(FChunkBuildData& Data)
+{
+	float  delimiter=0.01;
+	for (int xPerlin = Data.Coord.x*CHUNK_X, x =0; xPerlin <Data.Coord.x*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
-		ProcMesh =FreeMeshes.Last();
-		FreeMeshes.Pop();
+		float fx = (float)xPerlin;
+		for (int yPerlin = Data.Coord.y*CHUNK_X, y=0; yPerlin <Data.Coord.y*CHUNK_X+CHUNK_X; yPerlin++,y++)
+		{
+			int index2D = x + y * CHUNK_X;
+			float fy = (float)xPerlin;
+			float bedrockNoise = BedrockNoise.GetNoise(fx,fy);
+			int bedrockTop = BEDROCK_BASE + (int)((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT);
+			int height = Data.GetSurfaceHeight(x,y);
+			for (int z = 0; z < height; ++z)
+			{	
+				int index = x + y * CHUNK_X + z * CHUNK_X * CHUNK_Y;
+				if (z<bedrockTop || z==0)
+				{				
+					Data.SetBlock(x,y,z,BlockType::Cobblestone);
+					continue;
+				}
+				float room = CavesRoomNoise.GetNoise(fx, fy, (float)z);
+				float tunnel  = CavesTunnelNoise.GetNoise(fx, fy, (float)z);
+				float mask = GetHeightMask(z, 1, height - 6);
+				float density =
+					tunnel * 1.2f +     // тоннели важнее
+					room * 0.8f;        // залы реже
+				density *= mask;
+				if (density > 0.25f)
+				{
+					Data.SetBlock(x,y,z,BlockType::Air);
+				}
+			}
+		}
 	}
-	else
+}
+
+void ACubeGenerator::FinalizeChunk(const FChunkBuildData& Data)
+{
+	UMinecraftProceduralMeshComponent* ProcMesh;
+	if (FreeMeshes.IsEmpty())
 	{
 		ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
 		ProcMesh->RegisterComponent();
 		ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
 		ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	}
-	MeshToChunkMap.Add(ProcMesh,NewChunk);
-	
-	ProcMesh->SetRelativeLocation(FVector(coord.x*CHUNK_X*BLOCK_SIZE, coord.y*CHUNK_X*BLOCK_SIZE, 0));
-	MeshesMap.Add(coord,ProcMesh);
-	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
-	
-	TWeakObjectPtr<UChunk> WeakChunk = NewChunk;
-	TWeakObjectPtr<UMinecraftProceduralMeshComponent> WeakProcMesh = ProcMesh;
-	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
-	Async(EAsyncExecution::ThreadPool, [WeakChunk, WeakProcMesh, WeakThis, GM]()
-		{
-			if (!WeakChunk.IsValid())
-				return;
-			
-			GM->BuildGreedyMesh(WeakChunk.Get());
-			AsyncTask(ENamedThreads::GameThread, [WeakChunk, WeakProcMesh, WeakThis, GM]()
-			{
-				if (!WeakProcMesh.IsValid() || !WeakChunk.IsValid())
-					return;
-				GM->CreateMesh(*WeakProcMesh,WeakThis->Mat);
-			});
-		});
-	
-	
+	else
+	{
+		ProcMesh = FreeMeshes.Pop();		
+	}
+	ProcMesh->SetRelativeLocation(FVector(Data.Coord.x*CHUNK_X*BLOCK_SIZE, Data.Coord.y*CHUNK_X*BLOCK_SIZE, 0));
+	UGreedyMeshing* GreedyMeshing = NewObject<UGreedyMeshing>(this);
+	GreedyMeshing->BuildGreedyMesh(&Data);
+	GreedyMeshing->CreateMesh(*ProcMesh,Mat);
 }
 
 void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
@@ -349,7 +296,7 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	FChunkCoord chunkCoord;
 	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X);
 	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y);
-	UChunk* Chunk = MeshToChunkMap[mesh];
+	FChunkBuildData* Chunk = MeshToChunkMap[mesh];
 	
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
@@ -368,9 +315,3 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	}
 }
 
-
-void ACubeGenerator::Draw()
-{
-	LoadLayers();
-	ChunksInit();
-}

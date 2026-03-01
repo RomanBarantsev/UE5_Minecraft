@@ -2,8 +2,8 @@
 
 
 #include "GreedyMeshing.h"
-#include "CubeGenerator.h"
 #include "ProceduralMeshComponent.h"
+#include "Minecraft/FChunkBuildData.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
 bool UGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
@@ -24,15 +24,20 @@ bool UGreedyMeshing::IsAir(int x, int y, int z)
 }
 
 
-void UGreedyMeshing::BuildGreedyMesh(const UChunk* ch)
+void UGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
 {	
-	Chunk = ch;
+	Chunk = Data;
 	GreedyZPos( true);
 	GreedyZPos( false);
 	GreedyXPos( true);
 	GreedyXPos( false);
 	GreedyYPos( true);
 	GreedyYPos( false);
+}
+
+void UGreedyMeshing::BuildMesh(const FChunkBuildData& Data)
+{
+	
 }
 
 float UGreedyMeshing::GetTileIndex(BlockType Type)

@@ -4,6 +4,7 @@
 #include "MC_Pawn.h"
 
 #include "CubeGenerator.h"
+#include "FChunkBuildData.h"
 #include "MinecraftProceduralMeshComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
 #include "Kismet/GameplayStatics.h"
@@ -74,16 +75,10 @@ void AMC_Pawn::Fire()
 	}		
 }
 
-void AMC_Pawn::Redraw()
-{
-	CubeGenerator->Draw();
-}
-
 // Called to bind functionality to input
 void AMC_Pawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	InputComponent->BindAction("Fire",IE_Pressed,this,&ThisClass::Fire);
-	InputComponent->BindAction("Redraw",IE_Pressed,this,&ThisClass::Redraw);
 }
 
