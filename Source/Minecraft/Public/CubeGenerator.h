@@ -108,11 +108,6 @@ protected:
 	UDataTable* PerlinNoiseTable;
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
-	TMap<FChunkCoord,FChunkBuildData*> ChunkMap;
-	UPROPERTY()
-	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
-	UPROPERTY()
-	TArray<UMinecraftProceduralMeshComponent*> FreeMeshes;
 	UPROPERTY()
 	TArray<UGreedyMeshing*> GreedyMeshings;
 	UPROPERTY(EditAnywhere)
@@ -126,13 +121,16 @@ private:
 	void ChunkToProcMesh(const FChunkCoord& coord);
 	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateBlocksAndCaves(FChunkBuildData& Data);
-	void FinalizeChunk(const FChunkBuildData& Data);
-	TMap<FChunkCoord,FChunkBuildData*> Chunks;
-	TMap<FChunkCoord,FChunkBuildData*>NewChunks;
+	void FinalizeChunk(FChunkBuildData& Data);
+	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> Chunks;
+	TArray<FChunkBuildData*> FreeChunks;
+	UPROPERTY()
+	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
+	UPROPERTY()
+	TArray<UMinecraftProceduralMeshComponent*> FreeMeshes;
 	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
 	FChunkCoord currentChunkPosition;
 	
-	TQueue<FChunkCoord> ChunkGenerationQueue;
 	bool bIsGeneratingChunk = false;
 public:
 	UFUNCTION()
