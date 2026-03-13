@@ -6,7 +6,11 @@
 #include "Minecraft/FChunkBuildData.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
-bool UGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
+FGreedyMeshing::FGreedyMeshing()
+{
+}
+
+bool FGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 {
 	BlockType a = Chunk->GetBlock(x,y,z);
 	BlockType b = IsAir(x + dx, y + dy, z + dz)
@@ -16,15 +20,23 @@ bool UGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 	return a != BlockType::Air && b == BlockType::Air;
 }
 
-bool UGreedyMeshing::IsAir(int x, int y, int z)
+bool FGreedyMeshing::IsAir(int x, int y, int z)
 {
 	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X || y >= CHUNK_X || z >= CHUNK_Z)
 		return true; // за границей = воздух
 	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
 
+void FGreedyMeshing::Clear()
+{
+	Vertices.Empty();
+	Triangles.Empty();
+	Normals.Empty();
+	UVs.Empty();
+	UV1s.Empty();
+}
 
-void UGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
+void FGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
 {	
 	Chunk = Data;
 	GreedyZPos( true);
@@ -35,17 +47,17 @@ void UGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
 	GreedyYPos( false);
 }
 
-void UGreedyMeshing::BuildMesh(const FChunkBuildData& Data)
+void FGreedyMeshing::BuildMesh(const FChunkBuildData& Data)
 {
 	
 }
 
-float UGreedyMeshing::GetTileIndex(BlockType Type)
+float FGreedyMeshing::GetTileIndex(BlockType Type)
 {
 	return (float)Type;
 }
 
-void UGreedyMeshing::GreedyZPos(bool bPositive)
+void FGreedyMeshing::GreedyZPos(bool bPositive)
 {
 	
 	FMaskCell Mask[CHUNK_X][CHUNK_X];
@@ -119,7 +131,7 @@ void UGreedyMeshing::GreedyZPos(bool bPositive)
 	}
 }
 
-void UGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
+void FGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
 {
     float zPos = bPositive ? (z + 1) * BLOCK_SIZE : z * BLOCK_SIZE;
 
@@ -195,7 +207,7 @@ void UGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive,
 		UV1s.Add({ baseU, baseV });
 }
 
-void UGreedyMeshing::GreedyXPos(bool bPositive)
+void FGreedyMeshing::GreedyXPos(bool bPositive)
 {
     int dx = bPositive ? 1 : -1;
 
@@ -278,7 +290,7 @@ void UGreedyMeshing::GreedyXPos(bool bPositive)
     }
 }
 
-void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
+void FGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
 {
     float xCoord;
     FVector Normal;
@@ -348,7 +360,7 @@ void UGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
 	Tailing(baseU,baseV,w,h,bPositive);   
 }
 
-void UGreedyMeshing::Tailing(float baseU, float baseV, int w,int h, bool bPositive)
+void FGreedyMeshing::Tailing(float baseU, float baseV, int w,int h, bool bPositive)
 {
 	if (bPositive)
 	{
@@ -371,7 +383,7 @@ void UGreedyMeshing::Tailing(float baseU, float baseV, int w,int h, bool bPositi
 		UV1s.Add(FVector2D(baseU, baseV ));
 }
 
-void UGreedyMeshing::GreedyYPos(bool bPositive)
+void FGreedyMeshing::GreedyYPos(bool bPositive)
 {
     int dy = bPositive ? 1 : -1;
 
@@ -445,7 +457,7 @@ void UGreedyMeshing::GreedyYPos(bool bPositive)
         }
     }
 }
-void UGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
+void FGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
 {
     // Для оси Y:
     // w - размер по X (width)
@@ -543,7 +555,7 @@ void UGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive,
  
 }
 
-FVector UGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat)
+FVector FGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat)
 {
 	procMesh.CreateMeshSection(
 	0,

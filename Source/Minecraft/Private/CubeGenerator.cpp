@@ -5,7 +5,6 @@
 
 #include "BreakableCube.h"
 #include "GreedyMeshing.h"
-#include "DSP/LFO.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/FChunkBuildData.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
@@ -117,8 +116,28 @@ void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params
 }
 
 
+void ACubeGenerator::ProcessQueue()
+{
+	while (!ChunkGenerationQueue.IsEmpty())
+	{
+		FChunkCoord CoordToBuild;
+		if (ChunkGenerationQueue.Dequeue(CoordToBuild))
+		{
+			StartAsyncGeneration(CoordToBuild);
+		}
+	}
+}
+
 void ACubeGenerator::UpdateChunks(FVector coord)
 {	
+	ProcessQueue();
+	if (!ChunksForRemote.IsEmpty())
+	{
+		for (auto Chunk : ChunksForRemote)
+		{
+			RemoveChunk(Chunk.Key);
+		}
+	}
 	double TStart = FPlatformTime::Seconds();
 	coord/=BLOCK_SIZE;
 	FChunkCoord chunkCoord;
@@ -133,23 +152,32 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 		currentChunkPosition.startPos=false;
 		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDelimiter) * chunkDelimiter;
 		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDelimiter) * chunkDelimiter;
-		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);	
-		
-		for (auto& Pair : Chunks)
-		{			
-			ChunkRemove(Pair.Key);
+		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);
+		ChunksForRemote = Chunks;
+		Chunks.Empty();
+		for (auto Chunk : Chunks)
+		{
+			RemoveChunk(Chunk.Key);
 		}
-		
 		for (int x  = chunkCoord.x-chunkDelimiter*2; x < chunkCoord.x+chunkDelimiter*2; ++x)
 		{
 			for (int y = chunkCoord.y-chunkDelimiter*2; y < chunkCoord.y+chunkDelimiter*2; ++y)
-			{				
-				ChunkToProcMesh(FChunkCoord{x,y});
+			{
+				FChunkCoord newCoord{x,y};
+				if (!ChunksForRemote.Contains(newCoord))
+				{
+					Chunks.Add(newCoord,nullptr);
+					ChunkGenerationQueue.Enqueue(newCoord);
+				}
+				else
+				{
+					Chunks.Add(newCoord,ChunksForRemote[newCoord]);
+					ChunksForRemote.Remove(newCoord);
+				}				
 			}
-		}
+		}		
 		//ChunkToProcMesh(FChunkCoord{0,0});
-		Chunks.Empty();		
-		UE_LOG(LogTemp,Warning, TEXT("FreeMeshes %d"),FreeMeshes.Num());
+		UE_LOG(LogTemp,Warning, TEXT("FreeProcMeshes %d"),FreeProcMeshes.Num());
 		double T1 = FPlatformTime::Seconds();
 		UE_LOG(LogTemp, Warning,
 			TEXT("Chunks Init: %.2f ms"),
@@ -174,45 +202,57 @@ int ACubeGenerator::GetSurfaceHigh(FVector vec)
 	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
 }
 
-void ACubeGenerator::ChunkRemove(FChunkCoord coord)
+void ACubeGenerator::RemoveChunk(FChunkCoord coord)
 {
-	UMinecraftProceduralMeshComponent* Mesh = MeshesMap[coord];
-	Mesh->ClearAllMeshSections();
-	MeshesMap.Remove(coord);
-	FreeMeshes.Add(Mesh);
-	MeshToChunkMap.Remove(Mesh);
+	if (MeshesMap.Contains(coord))
+	{
+		UMinecraftProceduralMeshComponent* Mesh = MeshesMap[coord];
+		Mesh->ClearAllMeshSections();
+		MeshesMap.Remove(coord);
+		FreeProcMeshes.Add(Mesh);
+		MeshToChunkMap.Remove(Mesh);
+		//FreeChunkцs.Add(Chunks[coord].Get());	
+	}	
 }
 
-void ACubeGenerator::ChunkToProcMesh(const FChunkCoord& coord)
+void ACubeGenerator::StartAsyncGeneration(const FChunkCoord& coord)
 {
 	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
 	TSharedPtr<FChunkBuildData> BuildDataPtr = nullptr;
+	TSharedPtr<FGreedyMeshing> GreedyMeshing = nullptr;
 	if (!FreeChunks.IsEmpty())
 	{
-		auto Chunk = FreeChunks.Pop();	
+		auto Chunk = FreeChunks.Pop();
 		BuildDataPtr = MakeShared<FChunkBuildData>(*Chunk);
 	}
 	else
 	{
 		BuildDataPtr = MakeShared<FChunkBuildData>();
 	}
+	if (!FreeGreedyMeshings.IsEmpty())
+	{
+		GreedyMeshing = MakeShareable(FreeGreedyMeshings.Pop());
+		GreedyMeshing->Clear();
+	}
+	else
+	{
+		GreedyMeshing = MakeShared<FGreedyMeshing>();
+	}
 	if (!BuildDataPtr)
 		return;
-	Async(EAsyncExecution::ThreadPool, [WeakThis,coord,BuildDataPtr]()
+	Async(EAsyncExecution::ThreadPool, [WeakThis,coord,BuildDataPtr,GreedyMeshing]()
 	{
 		if (!WeakThis.IsValid())
 			return;
-		
-		UE_LOG(LogTemp, Warning, TEXT("NewChunk x %d y %d"),coord.x,coord.y);
 		BuildDataPtr.Get()->Coord = coord;
 		
 		WeakThis->GenerateChunkData(*BuildDataPtr.Get());
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, BuildDataPtr]() mutable  
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, BuildDataPtr,GreedyMeshing]() mutable  
 		{
 			if (!WeakThis.IsValid())
 				return;			
-			WeakThis->Chunks.Add(BuildDataPtr.Get()->Coord, BuildDataPtr);
-			WeakThis->FinalizeChunk(*BuildDataPtr.Get());
+			WeakThis->Chunks[BuildDataPtr->Coord] = BuildDataPtr;
+			WeakThis->FinalizeChunk(*BuildDataPtr.Get(), *GreedyMeshing.Get());
 		});	
 	});
 }
@@ -229,11 +269,11 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 			Data.SetSurfaceHeight(x,y,height);
 		}
 	}
-	GenerateBlocksAndCaves(Data);
+	GenerateCaves(Data);
 	Data.Fill();
 }
 
-void ACubeGenerator::GenerateBlocksAndCaves(FChunkBuildData& Data)
+void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 {
 	float  delimiter=0.01;
 	for (int xPerlin = Data.Coord.x*CHUNK_X, x =0; xPerlin <Data.Coord.x*CHUNK_X+CHUNK_X; xPerlin++,x++)
@@ -242,7 +282,7 @@ void ACubeGenerator::GenerateBlocksAndCaves(FChunkBuildData& Data)
 		for (int yPerlin = Data.Coord.y*CHUNK_X, y=0; yPerlin <Data.Coord.y*CHUNK_X+CHUNK_X; yPerlin++,y++)
 		{
 			int index2D = x + y * CHUNK_X;
-			float fy = static_cast<float>(xPerlin);
+			float fy = static_cast<float>(yPerlin);
 			float bedrockNoise = BedrockNoise.GetNoise(fx,fy);
 			int bedrockTop = BEDROCK_BASE + static_cast<int>(((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
 			int height = Data.GetSurfaceHeight(x,y);
@@ -269,10 +309,10 @@ void ACubeGenerator::GenerateBlocksAndCaves(FChunkBuildData& Data)
 	}
 }
 
-void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data)
+void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing)
 {
 	UMinecraftProceduralMeshComponent* ProcMesh;
-	if (FreeMeshes.IsEmpty())
+	if (FreeProcMeshes.IsEmpty())
 	{
 		ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
 		ProcMesh->RegisterComponent();
@@ -281,12 +321,11 @@ void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data)
 	}
 	else
 	{
-		ProcMesh = FreeMeshes.Pop();		
+		ProcMesh = FreeProcMeshes.Pop();		
 	}
 	ProcMesh->SetRelativeLocation(FVector(Data.Coord.x*CHUNK_X*BLOCK_SIZE, Data.Coord.y*CHUNK_X*BLOCK_SIZE, 0));
-	UGreedyMeshing* GreedyMeshing = NewObject<UGreedyMeshing>(this);
-	GreedyMeshing->BuildGreedyMesh(&Data);
-	GreedyMeshing->CreateMesh(*ProcMesh,Mat);
+	GreedyMeshing.BuildGreedyMesh(&Data);
+	GreedyMeshing.CreateMesh(*ProcMesh,Mat);
 	MeshesMap.Add(Data.Coord,ProcMesh);
 	MeshToChunkMap.Add(ProcMesh,&Data);
 }
@@ -308,9 +347,6 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
-	UGreedyMeshing* GM = NewObject<UGreedyMeshing>();
-	GM->BuildGreedyMesh(Chunk);
-	GM->CreateMesh(*mesh,Mat);	
 	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	FActorSpawnParameters spawnParams;
 	//TODO make a pool

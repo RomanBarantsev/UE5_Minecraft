@@ -45,14 +45,9 @@ constexpr float CHUNKSIZE_WIDE = BLOCK_SIZE*CHUNK_X;
 struct FChunkBuildData
 {
 private:
-	std::vector<uint8> Blocks;     // BlockType as uint8
-	std::vector<uint16> SurfaceHeights;
-
-	TArray<FVector> Vertices;
-	TArray<int32> Triangles;
-	TArray<FVector> Normals;
-	TArray<FVector2D> UVs;
-	TArray<FVector2D> UV1s;
+	std::vector<uint8> Blocks;
+	std::vector<uint8> SurfaceHeights;
+	
 public:
 	FChunkCoord Coord;
 	FChunkBuildData();

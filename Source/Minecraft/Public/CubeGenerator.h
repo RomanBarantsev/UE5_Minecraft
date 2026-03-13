@@ -2,9 +2,6 @@
 
 #pragma once
 
-#include <map>
-#include <unordered_map>
-
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
@@ -12,9 +9,9 @@
 #include "CubeGenerator.generated.h"
 
 struct FChunkBuildData;
+class FGreedyMeshing;
 class UMinecraftProceduralMeshComponent;
 class UDataTable;
-class UGreedyMeshing;
 
 USTRUCT(BlueprintType)
 struct FPerlinNoiseBiom : public FTableRowBase
@@ -108,8 +105,6 @@ protected:
 	UDataTable* PerlinNoiseTable;
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
-	UPROPERTY()
-	TArray<UGreedyMeshing*> GreedyMeshings;
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> DestroyedBlockClass;
 private:
@@ -117,22 +112,25 @@ private:
 	float GetHeightMask(int z, int minZ, int maxZ);
 	int mapHeight(int x, int y);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
-	void ChunkRemove(FChunkCoord coord);
-	void ChunkToProcMesh(const FChunkCoord& coord);
+	void RemoveChunk(FChunkCoord coord);
+	void StartAsyncGeneration(const FChunkCoord& coord);
 	void GenerateChunkData(FChunkBuildData& Data);
-	void GenerateBlocksAndCaves(FChunkBuildData& Data);
-	void FinalizeChunk(FChunkBuildData& Data);
+	void GenerateCaves(FChunkBuildData& Data);
+	void FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing);
 	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> Chunks;
+	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> ChunksForRemote;
 	TArray<FChunkBuildData*> FreeChunks;
+	TArray<FGreedyMeshing*> FreeGreedyMeshings;	
 	UPROPERTY()
 	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
 	UPROPERTY()
-	TArray<UMinecraftProceduralMeshComponent*> FreeMeshes;
+	TArray<UMinecraftProceduralMeshComponent*> FreeProcMeshes;
 	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
 	FChunkCoord currentChunkPosition;
-	
+	TQueue<FChunkCoord,EQueueMode::Spsc> ChunkGenerationQueue;
 	bool bIsGeneratingChunk = false;
 public:
+	void ProcessQueue();
 	UFUNCTION()
 	void UpdateChunks(FVector coord);
 public:

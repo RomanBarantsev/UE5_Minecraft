@@ -3,9 +3,6 @@
 #pragma once
 
 #include <vector>
-#include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "GreedyMeshing.generated.h"
 
 struct FChunkBuildData;
 enum BlockType : uint8;
@@ -26,16 +23,16 @@ struct FMaskCell
 /**
  * 
  */
-UCLASS()
-class MINECRAFT_API UGreedyMeshing : public UObject
+class FGreedyMeshing 
 {
-	GENERATED_BODY()
+public:
+	FGreedyMeshing();
 private:
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
-	TArray<FVector2D> UV1s; // Второй UV канал
+	TArray<FVector2D> UV1s;
 	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz);
 	bool IsAir(int x, int y, int z);
 	float GetTileIndex(BlockType Type);
@@ -45,8 +42,9 @@ private:
 	void AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 	void Tailing(float baseU, float baseV, int w, int h, bool bPositive);
 	void GreedyYPos(bool bPositive);
-	const FChunkBuildData* Chunk;
+	const FChunkBuildData* Chunk=nullptr;
 public:
+	void Clear();
 	void BuildGreedyMesh(const FChunkBuildData* Data);
 	void BuildMesh(const FChunkBuildData& Data);
 	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);

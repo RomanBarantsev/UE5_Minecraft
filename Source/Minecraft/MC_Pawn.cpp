@@ -37,7 +37,7 @@ void AMC_Pawn::BeginPlay()
 		UE_LOG(LogTemp,Error,TEXT("CubeGenerator is nullptr"));
 	}
 	//PlaceAboveSurface();
-	GetWorld()->GetTimerManager().SetTimer(WorldUpdateTimerHandle,this,&AMC_Pawn::WorldUpdate,2.0f,true,0);
+	GetWorld()->GetTimerManager().SetTimer(WorldUpdateTimerHandle,this,&AMC_Pawn::WorldUpdate,1.0f,true,0);
 }
 
 void AMC_Pawn::WorldUpdate()
