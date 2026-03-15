@@ -7,7 +7,7 @@
 #include "MC_Pawn.generated.h"
 
 class ACubeGenerator;
-class UGreedyMeshing;
+class FGreedyMeshing;
 
 UCLASS()
 class MINECRAFT_API AMC_Pawn : public ADefaultPawn
