@@ -27,7 +27,7 @@ void FChunkBuildData::Fill()
 				}
 				else if (z == surface)
 				{
-					Blocks[idx] = Bricks;
+					Blocks[idx] = Grass;
 				}
 				else if (Blocks[idx] == Empty)
 				{
