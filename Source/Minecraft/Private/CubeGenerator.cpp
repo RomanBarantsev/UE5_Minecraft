@@ -14,11 +14,10 @@ class UProceduralMeshComponent;
 
 ACubeGenerator::ACubeGenerator()
 {
-	PrimaryActorTick.bCanEverTick = false;	
+	PrimaryActorTick.bCanEverTick = true;	
 	// Создаём корневой компонент
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-
-	
+		
 }
 
 void ACubeGenerator::LoadLayers()
@@ -59,6 +58,51 @@ void ACubeGenerator::BeginPlay()
 	//time start
 	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
 	//time end
+}
+
+void ACubeGenerator::Tick(float DeltaSeconds)
+{	
+	Super::Tick(DeltaSeconds);	
+	
+	TArray<FAsyncGenerationResult> Results;
+	Results.SetNum(CoordsToGenerate.Num());
+	if (CoordsToGenerate.IsEmpty())
+		return;
+	
+	TArray<FChunkCoord> GenerateArray;
+	for (int i = 0; i < OperationPerTick; i++)
+	{
+		GenerateArray.Push(CoordsToGenerate.Pop());
+	}
+	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
+	Async(EAsyncExecution::ThreadPool,[WeakThis,GenerateArray,Results]() mutable
+	{
+		ParallelFor(GenerateArray.Num(),[&](int32 i)
+		{
+			if (!WeakThis.IsValid())
+				return;
+			FChunkCoord CurrentCoord = GenerateArray[i];
+			
+			auto Data = MakeShared<FChunkBuildData>();
+			Data->Coord = CurrentCoord;
+			
+			WeakThis->GenerateChunkData(*Data);
+			
+			auto Mesher = MakeShared<FGreedyMeshing>();
+			Mesher->BuildGreedyMesh(&Data.Get());
+			Results[i] = {CurrentCoord,Data,Mesher};
+		});
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, Results]() {
+		if (WeakThis.IsValid()) {
+			for (const auto& Res : Results) {
+				if (Res.BuildData.IsValid()) {
+					WeakThis->Chunks[Res.Coord] = Res.BuildData;
+					WeakThis->FinalizeChunk(*Res.BuildData, *Res.GreedyMeshing);
+				}
+			}
+		}
+		});
+	});
 }
 
 
@@ -116,23 +160,9 @@ void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params
 }
 
 
-void ACubeGenerator::ProcessQueue()
-{
-	while (!ChunkGenerationQueue.IsEmpty())
-	{
-		FChunkCoord CoordToBuild;
-		if (ChunkGenerationQueue.Dequeue(CoordToBuild))
-		{
-			StartAsyncGeneration(CoordToBuild);
-		}
-	}
-}
-
 void ACubeGenerator::UpdateChunks(FVector coord)
-{	
-	
+{		
 	double TStart = FPlatformTime::Seconds();
-	ProcessQueue();
 	if (!ChunksForRemote.IsEmpty())
 	{
 		for (auto Chunk : ChunksForRemote)
@@ -155,20 +185,17 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDelimiter) * chunkDelimiter;
 		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);
 		ChunksForRemote = Chunks;
-		Chunks.Empty();
-		for (auto Chunk : Chunks)
-		{
-			RemoveChunk(Chunk.Key);
-		}
+		Chunks.Empty();		
+		
 		for (int x  = chunkCoord.x-chunkDelimiter*2; x < chunkCoord.x+chunkDelimiter*2; ++x)
 		{
 			for (int y = chunkCoord.y-chunkDelimiter*2; y < chunkCoord.y+chunkDelimiter*2; ++y)
 			{
 				FChunkCoord newCoord{x,y};
 				if (!ChunksForRemote.Contains(newCoord))
-				{
+				{	
+					CoordsToGenerate.Add(newCoord);				
 					Chunks.Add(newCoord,nullptr);
-					ChunkGenerationQueue.Enqueue(newCoord);
 				}
 				else
 				{
@@ -176,7 +203,7 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 					ChunksForRemote.Remove(newCoord);
 				}				
 			}
-		}		
+		}	
 	}
 	double TEnd = FPlatformTime::Seconds();
 	UE_LOG(LogTemp, Warning, TEXT("Building chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
@@ -208,48 +235,6 @@ void ACubeGenerator::RemoveChunk(FChunkCoord coord)
 		MeshToChunkMap.Remove(Mesh);
 		//FreeChunkцs.Add(Chunks[coord].Get());	
 	}	
-}
-
-void ACubeGenerator::StartAsyncGeneration(const FChunkCoord& coord)
-{
-	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
-	TSharedPtr<FChunkBuildData> BuildDataPtr = nullptr;
-	TSharedPtr<FGreedyMeshing> GreedyMeshing = nullptr;
-	if (!FreeChunks.IsEmpty())
-	{
-		auto Chunk = FreeChunks.Pop();
-		BuildDataPtr = MakeShared<FChunkBuildData>(*Chunk);
-	}
-	else
-	{
-		BuildDataPtr = MakeShared<FChunkBuildData>();
-	}
-	if (!FreeGreedyMeshings.IsEmpty())
-	{
-		GreedyMeshing = MakeShareable(FreeGreedyMeshings.Pop());
-		GreedyMeshing->Clear();
-	}
-	else
-	{
-		GreedyMeshing = MakeShared<FGreedyMeshing>();
-	}
-	if (!BuildDataPtr)
-		return;	
-	Async(EAsyncExecution::ThreadPool, [WeakThis,coord,BuildDataPtr,GreedyMeshing]()
-	{
-		if (!WeakThis.IsValid())
-			return;
-		BuildDataPtr.Get()->Coord = coord;
-		WeakThis->GenerateChunkData(*BuildDataPtr.Get());
-		GreedyMeshing->BuildGreedyMesh(BuildDataPtr.Get());
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, BuildDataPtr,GreedyMeshing]() mutable  
-		{
-			if (!WeakThis.IsValid())
-				return;			
-			WeakThis->Chunks[BuildDataPtr->Coord] = BuildDataPtr;
-			WeakThis->FinalizeChunk(*BuildDataPtr.Get(), *GreedyMeshing.Get());
-		});	
-	});
 }
 
 void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
@@ -313,6 +298,7 @@ void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyM
 		ProcMesh->RegisterComponent();
 		ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
 		ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		ProcMesh->bUseAsyncCooking = true;
 	}
 	else
 	{
@@ -326,6 +312,7 @@ void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyM
 
 void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
 {
+	double TStart = FPlatformTime::Seconds();
 	FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
 	FVector LocalPos =mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);
 	int X = FMath::FloorToInt(LocalPos.X / BLOCK_SIZE);
@@ -341,7 +328,7 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
-	
+	mesh->bUseAsyncCooking = true; //????
 	FGreedyMeshing GreedyMeshing;	
 	GreedyMeshing.BuildGreedyMesh(Chunk);
 	GreedyMeshing.CreateMesh(*mesh,Mat);
@@ -354,5 +341,7 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	{
 		Cube->FractureNow(CurrentBlockType,Hit);
 	}
+	double TEnd = FPlatformTime::Seconds();
+	UE_LOG(LogTemp, Warning, TEXT("ReBuilding chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
 }
 

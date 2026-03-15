@@ -81,6 +81,7 @@ protected:
 	void LoadLayers();
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	const int CubeSpacing = 0;
 	
 	FastNoiseLite CavesRoomNoise;
@@ -113,24 +114,33 @@ private:
 	int mapHeight(int x, int y);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	void RemoveChunk(FChunkCoord coord);
-	void StartAsyncGeneration(const FChunkCoord& coord);
 	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateCaves(FChunkBuildData& Data);
 	void FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing);
+	
+	struct FAsyncGenerationResult {
+		FChunkCoord Coord;
+		TSharedPtr<FChunkBuildData> BuildData;
+		TSharedPtr<FGreedyMeshing> GreedyMeshing;
+	};
+	UPROPERTY()
+	TArray<FChunkCoord> CoordsToGenerate;
+	size_t OperationPerTick=1;
+	
 	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> Chunks;
 	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> ChunksForRemote;
+	
 	TArray<FChunkBuildData*> FreeChunks;
 	TArray<FGreedyMeshing*> FreeGreedyMeshings;	
 	UPROPERTY()
-	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
-	UPROPERTY()
 	TArray<UMinecraftProceduralMeshComponent*> FreeProcMeshes;
+	
+	UPROPERTY()
+	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
 	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
 	FChunkCoord currentChunkPosition;
-	TQueue<FChunkCoord,EQueueMode::Spsc> ChunkGenerationQueue;
 	bool bIsGeneratingChunk = false;
 public:
-	void ProcessQueue();
 	UFUNCTION()
 	void UpdateChunks(FVector coord);
 public:
