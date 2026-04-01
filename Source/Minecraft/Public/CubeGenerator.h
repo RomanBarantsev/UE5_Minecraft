@@ -6,9 +6,9 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/FastNoiseLite.h"
+#include "Minecraft/FChunkBuildData.h"
 #include "CubeGenerator.generated.h"
 
-struct FChunkBuildData;
 class FGreedyMeshing;
 class UMinecraftProceduralMeshComponent;
 class UDataTable;
@@ -39,40 +39,54 @@ public:
 	float Lacunarity;
 	FName rowName;
 };
+enum BiomType{
+	Desert,
+	Plain,
+	Mountains
+};
 
-USTRUCT(BlueprintType)
-struct FChunkCoord
+struct FBiomParam
 {
-	GENERATED_BODY()
-	int x;
-	int y;
-	bool startPos=true;
-	bool operator==(const FChunkCoord& rhs) const
+public:
+	BiomType Type;
+	BlockType BlockTopping;
+	float FromValue;
+	float ToValue;
+	//name for name, block type - topping, from which value Continentalness
+	FBiomParam(BiomType type, BlockType block,float from,float to)
 	{
-		return x == rhs.x && y == rhs.y;
-	}
-	bool operator<(const FChunkCoord& rhs) const
-	{
-		if (x != rhs.x) return x < rhs.x;
-		return y < rhs.y;
+		Type = type;
+		BlockTopping = block;
+		FromValue = from;
+		ToValue = to;
 	}
 };
 
-FORCEINLINE uint32 GetTypeHash(const FChunkCoord& Key)
+struct FBioms
 {
-	// Простой способ: скомбинировать хеши полей
-	uint32 Hash = GetTypeHash(Key.x);
-	Hash = HashCombine(Hash, GetTypeHash(Key.y));
-	return Hash;
-}
+public:	
+	FBiomParam Desert = FBiomParam(BiomType::Desert, BlockType::Sand,-1.0,-0.6);
+	FBiomParam Plain  = FBiomParam(BiomType::Plain, BlockType::Grass,-0.4,0.4);
+	FBiomParam Mountains = FBiomParam(BiomType::Mountains, BlockType::Snow,0.6,1.0);
+};
+
+struct Noises
+{
+	float CavesRoom;
+	float CavesTunnel;
+	float ContNoise;
+	float PeaksValleys;
+	float Bedrock;
+	float Erosion;
+};
 
 UCLASS()
 class MINECRAFT_API ACubeGenerator : public AActor
 {
 	GENERATED_BODY()
 private:
-	int START_CHUNKS = 2;
-	const int chunkDelimiter=2;
+	const int chunkDelimiter=4;
+	const float delimiterChunkHeight=0.05;
 
 public:
 	// Sets default values for this actor's properties
@@ -86,19 +100,24 @@ protected:
 	
 	FastNoiseLite CavesRoomNoise;
 	FastNoiseLite CavesTunnelNoise;
-	FastNoiseLite SurfaceNoise;
 	FastNoiseLite ContNoise;
-	FastNoiseLite PeakNoise;
+	FastNoiseLite PeaksValleysNoise;
 	FastNoiseLite BedrockNoise;
+	FastNoiseLite ErosionNoise;
+	TMap<FastNoiseLite*,FText> FastNoises;
 	FNoisesParams CavesRoomParams;
 	FNoisesParams CavesTunnelParams;
-	FNoisesParams SurfaceParams;
 	FNoisesParams ContParams;
-	FNoisesParams PeakParams;
+	FNoisesParams PeaksValleysParams;
 	FNoisesParams BedrockParams;
-	
+	FNoisesParams ErosionParams;
+	FBioms Bioms;
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
+	UPROPERTY(EditAnywhere)
+	UCurveFloat* PeaksValleysCurve;
+	UPROPERTY(EditAnywhere)
+	UCurveFloat* ErosionCurve;
 	
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	
@@ -111,19 +130,21 @@ protected:
 private:
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	float GetHeightMask(int z, int minZ, int maxZ);
-	int mapHeight(int x, int y);
+	int mapHeight(Noises noises);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	void RemoveChunk(FChunkCoord coord);
 	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateCaves(FChunkBuildData& Data);
-	void FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing);
+	int CalculateBlockHeight(float value);	
+	void GenerateSurfaceLayer(int z, Noises& noises, FChunkBuildData& Data, int x, int y);
+	void FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing);
 	
 	struct FAsyncGenerationResult {
 		FChunkCoord Coord;
 		TSharedPtr<FChunkBuildData> BuildData;
 		TSharedPtr<FGreedyMeshing> GreedyMeshing;
 	};
-	UPROPERTY()
+	void AsyncChunkCreate(TArray<FChunkCoord>& GenerateArray,TArray<FAsyncGenerationResult>& Results);	
 	TArray<FChunkCoord> CoordsToGenerate;
 	size_t OperationPerTick=1;
 	
@@ -135,7 +156,6 @@ private:
 	UPROPERTY()
 	TArray<UMinecraftProceduralMeshComponent*> FreeProcMeshes;
 	
-	UPROPERTY()
 	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
 	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
 	FChunkCoord currentChunkPosition;
@@ -146,5 +166,8 @@ public:
 public:
 	int GetSurfaceHigh(FVector vec);
 	void RemoveBlock(FHitResult hit,UMinecraftProceduralMeshComponent* mesh);
+	TMap<FastNoiseLite*,FText> GetFastNoises();
 	float EPS = 0.1f;	
+private:
+	void PrintNoises(int x, int y, int z);
 };

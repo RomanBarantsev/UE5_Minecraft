@@ -23,29 +23,34 @@ ACubeGenerator::ACubeGenerator()
 void ACubeGenerator::LoadLayers()
 {
 	CavesRoomParams.rowName="CavesRoom";
+	FastNoises.Add(&CavesRoomNoise,FText::FromName(CavesRoomParams.rowName));
 	CavesTunnelParams.rowName="CavesTunnel";
+	FastNoises.Add(&CavesTunnelNoise,FText::FromName(CavesTunnelParams.rowName));	
 	
-	SurfaceParams.rowName="Surface";
-	ContParams.rowName="Continentalness";	
-	PeakParams.rowName="Peak";
-	
+	ContParams.rowName="Continentalness";
+	FastNoises.Add(&ContNoise,FText::FromName(ContParams.rowName));
+	PeaksValleysParams.rowName="PeaksValleys";
+	FastNoises.Add(&PeaksValleysNoise,FText::FromName(PeaksValleysParams.rowName));
 	BedrockParams.rowName="Bedrock";
+	FastNoises.Add(&BedrockNoise,FText::FromName(BedrockParams.rowName));
+	BedrockParams.rowName="Erosion";
+	FastNoises.Add(&ErosionNoise,FText::FromName(ErosionParams.rowName));
 	
 	LoadNoiseParams(CavesRoomNoise,CavesRoomParams);
 	LoadNoiseParams(CavesTunnelNoise,CavesTunnelParams);
 	
-	LoadNoiseParams(SurfaceNoise,SurfaceParams);
 	LoadNoiseParams(ContNoise,ContParams);
-	LoadNoiseParams(PeakNoise,PeakParams);
+	LoadNoiseParams(PeaksValleysNoise,PeaksValleysParams);
+	LoadNoiseParams(ErosionNoise,ErosionParams);
 	
 	LoadNoiseParams(BedrockNoise,BedrockParams);
 	
 	SetNoiseParams(CavesRoomNoise,CavesRoomParams, FastNoiseLite::NoiseType_Perlin);
 	SetNoiseParams(CavesTunnelNoise,CavesTunnelParams, FastNoiseLite::NoiseType_Perlin);	
 	
-	SetNoiseParams(SurfaceNoise,SurfaceParams, FastNoiseLite::NoiseType_Perlin);	
 	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);
-	SetNoiseParams(PeakNoise,PeakParams, FastNoiseLite::NoiseType_Perlin);
+	SetNoiseParams(PeaksValleysNoise,PeaksValleysParams, FastNoiseLite::NoiseType_Perlin);
+	SetNoiseParams(ErosionNoise,ErosionParams, FastNoiseLite::NoiseType_Perlin);
 	
 	SetNoiseParams(BedrockNoise,BedrockParams, FastNoiseLite::NoiseType_Perlin);	
 }
@@ -74,37 +79,9 @@ void ACubeGenerator::Tick(float DeltaSeconds)
 	{
 		GenerateArray.Push(CoordsToGenerate.Pop());
 	}
-	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
-	Async(EAsyncExecution::ThreadPool,[WeakThis,GenerateArray,Results]() mutable
-	{
-		ParallelFor(GenerateArray.Num(),[&](int32 i)
-		{
-			if (!WeakThis.IsValid())
-				return;
-			FChunkCoord CurrentCoord = GenerateArray[i];
-			
-			auto Data = MakeShared<FChunkBuildData>();
-			Data->Coord = CurrentCoord;
-			
-			WeakThis->GenerateChunkData(*Data);
-			
-			auto Mesher = MakeShared<FGreedyMeshing>();
-			Mesher->BuildGreedyMesh(&Data.Get());
-			Results[i] = {CurrentCoord,Data,Mesher};
-		});
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, Results]() {
-		if (WeakThis.IsValid()) {
-			for (const auto& Res : Results) {
-				if (Res.BuildData.IsValid()) {
-					WeakThis->Chunks[Res.Coord] = Res.BuildData;
-					WeakThis->FinalizeChunk(*Res.BuildData, *Res.GreedyMeshing);
-				}
-			}
-		}
-		});
-	});
+	AsyncChunkCreate(GenerateArray,Results);
+	
 }
-
 
 void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
 {
@@ -125,25 +102,14 @@ float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 	return 1.0f - t * t; // плавно затухает к поверхности
 }
 
-int ACubeGenerator::mapHeight(int x, int y)
-{
-	float cont = ContNoise.GetNoise((float)x, (float)y);     // [-1..1]
-	float surf = SurfaceNoise.GetNoise((float)x, (float)y);
-	float peaks = PeakNoise.GetNoise((float)x, (float)y);
-
-	cont = (cont + 1) * 0.5f;
-	surf = (surf + 1) * 0.5f;
-	peaks = fabs(peaks);
-
-	float baseHeight = FMath::Lerp(50.f, 85.f, cont);
-
-	float mountain = pow(peaks, 1.6f) * 45.f;
-
-	float detail = (surf - 0.5f) * 10.f;
-
-	float height = baseHeight + mountain + detail;
-
-	return FMath::Clamp((int)height, 1, CHUNK_Z - 2);
+int ACubeGenerator::mapHeight(Noises noises)
+{		
+	float cont = ContinentalnessCurve->GetFloatValue(noises.ContNoise);
+	float erosion = ErosionCurve->GetFloatValue(noises.Erosion);
+	float mountainHeight = noises.PeaksValleys * erosion * 5.0f;
+	float height = cont;
+	//float height = PeaksValleysCurve->GetFloatValue(noises.ContNoise+noises.PeaksValleys+noises.PeaksValleys);
+	return  FMath::Clamp((int)height, 1, CHUNK_Z - 2);
 }
 
 
@@ -161,7 +127,8 @@ void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params
 
 
 void ACubeGenerator::UpdateChunks(FVector coord)
-{		
+{
+	//PrintNoises(FMath::Abs(coord.X),FMath::Abs(coord.Y),FMath::Abs(coord.Z));
 	double TStart = FPlatformTime::Seconds();
 	if (!ChunksForRemote.IsEmpty())
 	{
@@ -187,6 +154,9 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 		ChunksForRemote = Chunks;
 		Chunks.Empty();		
 		
+		/*CoordsToGenerate.Add(FChunkCoord{0,0});				
+		Chunks.Add(FChunkCoord{0,0},nullptr);*/
+		
 		for (int x  = chunkCoord.x-chunkDelimiter*2; x < chunkCoord.x+chunkDelimiter*2; ++x)
 		{
 			for (int y = chunkCoord.y-chunkDelimiter*2; y < chunkCoord.y+chunkDelimiter*2; ++y)
@@ -206,7 +176,7 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 		}	
 	}
 	double TEnd = FPlatformTime::Seconds();
-	UE_LOG(LogTemp, Warning, TEXT("Building chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
+//UE_LOG(LogTemp, Warning, TEXT("Building chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
 }
 
 int ACubeGenerator::GetSurfaceHigh(FVector vec)
@@ -245,7 +215,27 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 		{			
 			int worldX = Data.Coord.x*CHUNK_X+x;
 			int worldY = Data.Coord.y*CHUNK_Y+y;
-			int height = mapHeight(worldX, worldY);
+			Noises noises;
+			noises.PeaksValleys = PeaksValleysNoise.GetNoise((float)worldX,(float)worldY);
+			noises.ContNoise = ContNoise.GetNoise((float)worldX,(float)worldY);
+			static float contMax=0;
+			static float contMin=0;
+			if (noises.ContNoise > contMax)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Max noise noise %f"),noises.ContNoise);
+				contMax = noises.ContNoise;
+			}
+			if (noises.ContNoise < contMin)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Min noise noise %f"),noises.ContNoise);
+				contMin = noises.ContNoise;
+			}
+			noises.Bedrock = BedrockNoise.GetNoise((float)worldX,(float)worldY);
+			noises.CavesRoom = CavesRoomNoise.GetNoise((float)worldX,(float)worldY);
+			noises.CavesTunnel = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
+			noises.Erosion = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
+			int height = mapHeight(noises);
+			//GenerateSurfaceLayer(height,noises,Data, x, y);
 			Data.SetSurfaceHeight(x,y,height);
 		}
 	}
@@ -255,7 +245,6 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 
 void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 {
-	float  delimiter=0.01;
 	for (int xPerlin = Data.Coord.x*CHUNK_X, x =0; xPerlin <Data.Coord.x*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
 		float fx = static_cast<float>(xPerlin);
@@ -269,7 +258,7 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 			for (int z = 0; z < height; ++z)
 			{	
 				if (z<bedrockTop || z==0)
-				{				
+				{					
 					Data.SetBlock(x,y,z,BlockType::Cobblestone);
 					continue;
 				}
@@ -286,6 +275,49 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 				}
 			}
 		}
+	}
+}
+
+int ACubeGenerator::CalculateBlockHeight(float value)
+{
+	value=FMath::Abs(fmod(value,0.5));
+	int val = static_cast<int>(value/delimiterChunkHeight);
+	return val==0 ? 1 : val;
+}
+
+void ACubeGenerator::GenerateSurfaceLayer(int z, Noises& noises,FChunkBuildData& Data,int x,int y)
+{	
+	BlockType type=BlockType::Air;
+	if (noises.ContNoise>=Bioms.Desert.FromValue && noises.ContNoise<Bioms.Desert.ToValue) //desert
+	{
+		type=Bioms.Desert.BlockTopping;	
+	}
+	else if (noises.ContNoise>Bioms.Plain.FromValue && noises.ContNoise<Bioms.Plain.ToValue) //plain
+	{
+		type=Bioms.Plain.BlockTopping;
+	}
+	else if (noises.ContNoise>Bioms.Mountains.FromValue && noises.ContNoise<=Bioms.Mountains.ToValue)//mountains
+	{
+		type=Bioms.Mountains.BlockTopping;	
+	}	
+	int layers = CalculateBlockHeight(noises.ContNoise);
+	/*if (noises.ContNoise>=Bioms.Desert.ToValue && noises.ContNoise<=Bioms.Plain.FromValue) //between desert and plain
+	{
+		if (layers%2==0)
+			type=Bioms.Desert.BlockTopping;
+		else
+			type=Bioms.Plain.BlockTopping;
+	}
+	if (noises.ContNoise>=Bioms.Plain.ToValue && noises.ContNoise<=Bioms.Mountains.FromValue) //between desert and plain
+	{
+		if (layers%2==0)
+			type=Bioms.Plain.BlockTopping;
+		else
+			type=Bioms.Mountains.BlockTopping;
+	}*/
+	for (int zz = 0; zz < layers; ++zz)
+	{
+		Data.SetBlock(x,y,z-zz,type);
 	}
 }
 
@@ -308,6 +340,42 @@ void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyM
 	GreedyMeshing.CreateMesh(*ProcMesh,Mat);
 	MeshesMap.Add(Data.Coord,ProcMesh);
 	MeshToChunkMap.Add(ProcMesh,&Data);
+}
+
+void ACubeGenerator::AsyncChunkCreate(TArray<FChunkCoord>& GenerateArray,TArray<FAsyncGenerationResult>& Results)
+{	
+	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
+	Async(EAsyncExecution::ThreadPool,[WeakThis,GenerateArray,Results]() mutable
+	{
+		ParallelFor(GenerateArray.Num(),[&](int32 i)
+		{
+			if (!WeakThis.IsValid())
+				return;
+			FChunkCoord CurrentCoord = GenerateArray[i];
+			
+			auto Data = MakeShared<FChunkBuildData>();
+			Data->Coord = CurrentCoord;
+			
+			WeakThis->GenerateChunkData(*Data);
+			
+			auto Mesher = MakeShared<FGreedyMeshing>();
+			Mesher->BuildGreedyMesh(&Data.Get());
+			Results[i] = {CurrentCoord,Data,Mesher};
+		});
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, Results]() {
+		if (WeakThis.IsValid()) {
+			for (const auto& Res : Results) {
+				if (Res.BuildData.IsValid()) {
+					if (WeakThis->Chunks.Contains(Res.Coord))
+					{
+						WeakThis->Chunks[Res.Coord] = Res.BuildData;
+						WeakThis->FinalizeChunk(*Res.BuildData, *Res.GreedyMeshing);
+					}					
+				}
+			}
+		}
+		});
+	});
 }
 
 void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
@@ -335,13 +403,25 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	FActorSpawnParameters spawnParams;
 	//TODO make a pool
-	auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,CubeLocation,FRotator::ZeroRotator,spawnParams);
+	/*auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,CubeLocation,FRotator::ZeroRotator,spawnParams);
 	ABreakableCube* Cube = Cast<ABreakableCube>(Actor);
 	if (Cube)
 	{
 		Cube->FractureNow(CurrentBlockType,Hit);
-	}
+	}*/
 	double TEnd = FPlatformTime::Seconds();
-	UE_LOG(LogTemp, Warning, TEXT("ReBuilding chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
+	//UE_LOG(LogTemp, Warning, TEXT("ReBuilding chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
 }
 
+TMap<FastNoiseLite*, FText> ACubeGenerator::GetFastNoises()
+{
+	return FastNoises;
+}
+
+void ACubeGenerator::PrintNoises(int x,int y,int z)
+{
+	for (auto Noise : FastNoises)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Noise: %s value: %f"),*Noise.Value.ToString(),Noise.Key->GetNoise((float)x,(float)y,(float)z));
+	}
+}
