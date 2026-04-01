@@ -1,16 +1,39 @@
 ﻿#pragma once
 #include <vector>
+#include "CoreMinimal.h"
 
-#include "CubeGenerator.h"
+struct FChunkCoord
+{
+	int x;
+	int y;
+	bool startPos=true;
+	bool operator==(const FChunkCoord& rhs) const
+	{
+		return x == rhs.x && y == rhs.y;
+	}
+	bool operator<(const FChunkCoord& rhs) const
+	{
+		if (x != rhs.x) return x < rhs.x;
+		return y < rhs.y;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FChunkCoord& Key)
+{
+	// Простой способ: скомбинировать хеши полей
+	uint32 Hash = GetTypeHash(Key.x);
+	Hash = HashCombine(Hash, GetTypeHash(Key.y));
+	return Hash;
+}
 
 enum BlockType : uint8
 {
 	Empty = 0,
-	Air = 1,
+	Air = 5,
 	Grass = 9,
 	Dirt = 3,
 	Stone = 2,
-	Wood = 5,
+	Snow = 1,
 	Leaves = 6,
 	Sand = 7,
 	Gravel = 8,
