@@ -105,11 +105,15 @@ float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 int ACubeGenerator::mapHeight(Noises noises)
 {		
 	float cont = ContinentalnessCurve->GetFloatValue(noises.ContNoise);
+	float baseVariation = noises.PeaksValleys * 4.0f;
+	float height = cont + baseVariation;
+	
 	float erosion = ErosionCurve->GetFloatValue(noises.Erosion);
-	float mountainHeight = noises.PeaksValleys * erosion * 5.0f;
-	float height = cont;
+	float mountainHeight = noises.PeaksValleys * erosion * 32.0f;
+	float mountainWeight = FMath::Max(0.0f, noises.ContNoise); 
+	float finalHeight = height + (mountainHeight * FMath::Pow(mountainWeight, 2.0f));
 	//float height = PeaksValleysCurve->GetFloatValue(noises.ContNoise+noises.PeaksValleys+noises.PeaksValleys);
-	return  FMath::Clamp((int)height, 1, CHUNK_Z - 2);
+	return  FMath::Clamp((int)finalHeight, 1, CHUNK_Z - 2);
 }
 
 
