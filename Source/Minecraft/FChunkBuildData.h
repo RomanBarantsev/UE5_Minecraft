@@ -26,6 +26,7 @@ FORCEINLINE uint32 GetTypeHash(const FChunkCoord& Key)
 	return Hash;
 }
 
+UENUM()
 enum BlockType : uint8
 {
 	Empty = 0,
