@@ -26,7 +26,7 @@ public:
 	FText BiomName;
 	
 	UPROPERTY(EditAnywhere, Category = "Terrain")
-	float HeightModifier = 0.0f;
+	float Offset = 0.0f;
 	
 	UPROPERTY(EditAnywhere, Category = "Terrain")
 	float VerticalScale = 0.0f;
