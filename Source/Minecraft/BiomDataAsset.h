@@ -15,6 +15,7 @@ class MINECRAFT_API UBiomDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
 public:
+	UBiomDataAsset();
 	UPROPERTY(EditAnywhere, Category = "Climate")
 	float TargetTemperature;
 
@@ -26,6 +27,9 @@ public:
 	
 	UPROPERTY(EditAnywhere, Category = "Terrain")
 	float HeightModifier = 0.0f;
+	
+	UPROPERTY(EditAnywhere, Category = "Terrain")
+	float VerticalScale = 0.0f;
 	
 	UPROPERTY(EditAnywhere, Category = "Terrain")
 	TMap<int32,TEnumAsByte<BlockType>> SurfaceLayers;
