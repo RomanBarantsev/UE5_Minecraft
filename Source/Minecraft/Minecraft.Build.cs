@@ -8,7 +8,7 @@ public class Minecraft : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore","ProceduralMeshComponent", "RenderCore","GeometryCollectionEngine" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore","ProceduralMeshComponent", "RenderCore","GeometryCollectionEngine","AssetRegistry" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "ProceduralMeshComponent","GeometryCollectionEngine" });
 
