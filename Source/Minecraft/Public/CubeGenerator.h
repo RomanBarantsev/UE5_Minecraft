@@ -9,6 +9,7 @@
 #include "Minecraft/FChunkBuildData.h"
 #include "CubeGenerator.generated.h"
 
+class UBiomDataAsset;
 class FGreedyMeshing;
 class UMinecraftProceduralMeshComponent;
 class UDataTable;
@@ -39,38 +40,8 @@ public:
 	float Lacunarity;
 	FName rowName;
 };
-enum BiomType{
-	Desert,
-	Plain,
-	Mountains
-};
 
-struct FBiomParam
-{
-public:
-	BiomType Type;
-	BlockType BlockTopping;
-	float FromValue;
-	float ToValue;
-	//name for name, block type - topping, from which value Continentalness
-	FBiomParam(BiomType type, BlockType block,float from,float to)
-	{
-		Type = type;
-		BlockTopping = block;
-		FromValue = from;
-		ToValue = to;
-	}
-};
-
-struct FBioms
-{
-public:	
-	FBiomParam Desert = FBiomParam(BiomType::Desert, BlockType::Sand,-1.0,-0.6);
-	FBiomParam Plain  = FBiomParam(BiomType::Plain, BlockType::Grass,-0.4,0.4);
-	FBiomParam Mountains = FBiomParam(BiomType::Mountains, BlockType::Snow,0.6,1.0);
-};
-
-struct Noises
+struct FNoises
 {
 	float CavesRoom;
 	float CavesTunnel;
@@ -78,6 +49,22 @@ struct Noises
 	float PeaksValleys;
 	float Bedrock;
 	float Erosion;
+};
+
+USTRUCT()
+struct FBiomLUTMap
+{
+	GENERATED_BODY()
+	
+	UPROPERTY()
+	UBiomDataAsset* Biome;
+	UPROPERTY()
+	float VerticalScale;
+	
+	UPROPERTY()
+	float HeightOffset;
+	FBiomLUTMap(float W,float V,UBiomDataAsset* DataAsset) : Biome(DataAsset),VerticalScale(V),HeightOffset(W){};
+	FBiomLUTMap() : Biome(nullptr), VerticalScale(0.0f), HeightOffset(0.0f){};
 };
 
 UCLASS()
@@ -96,7 +83,20 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
-	const int CubeSpacing = 0;
+	
+	UPROPERTY()
+	TArray<UBiomDataAsset*> BiomesArray;	
+	UPROPERTY()
+	TArray<FBiomLUTMap> BiomesLUTArray;	
+	const int BiomesArraySize = 40000;
+	
+	FBiomLUTMap& GetLUTData(int T, int H) {
+		return BiomesLUTArray[(T + 100) * 200 + (H + 100)];
+	}
+	
+	void LoadAllBioms();
+	void InitializeBiomeMap();
+	FBiomLUTMap CalculateBiomWeights(int T, int H);
 	
 	FastNoiseLite CavesRoomNoise;
 	FastNoiseLite CavesTunnelNoise;
@@ -111,7 +111,7 @@ protected:
 	FNoisesParams PeaksValleysParams;
 	FNoisesParams BedrockParams;
 	FNoisesParams ErosionParams;
-	FBioms Bioms;
+		
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
 	UPROPERTY(EditAnywhere)
@@ -130,13 +130,13 @@ protected:
 private:
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	float GetHeightMask(int z, int minZ, int maxZ);
-	int mapHeight(Noises noises);
+	int mapHeight(FNoises noises);
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 	void RemoveChunk(FChunkCoord coord);
 	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateCaves(FChunkBuildData& Data);
 	int CalculateBlockHeight(float value);	
-	void GenerateSurfaceLayer(int z, Noises& noises, FChunkBuildData& Data, int x, int y);
+	void GenerateSurfaceLayer(int z, FNoises& noises, FChunkBuildData& Data, int x, int y);
 	void FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing);
 	
 	struct FAsyncGenerationResult {

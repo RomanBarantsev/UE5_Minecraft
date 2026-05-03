@@ -5,6 +5,8 @@
 
 #include "BreakableCube.h"
 #include "GreedyMeshing.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Minecraft/BiomDataAsset.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/FChunkBuildData.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
@@ -59,6 +61,8 @@ void ACubeGenerator::LoadLayers()
 void ACubeGenerator::BeginPlay()
 {
 	Super::BeginPlay();
+	LoadAllBioms();
+	InitializeBiomeMap();
 	LoadLayers();
 	//time start
 	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
@@ -83,6 +87,81 @@ void ACubeGenerator::Tick(float DeltaSeconds)
 	
 }
 
+void ACubeGenerator::LoadAllBioms()
+{
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+	
+	TArray<FAssetData> AssetDataList;
+	FARFilter Filter;
+	Filter.ClassPaths.Add(UBiomDataAsset::StaticClass()->GetClassPathName());
+	Filter.PackagePaths.Add("/Game/Data");
+	Filter.bRecursivePaths = true;
+	
+	AssetRegistry.GetAssets(Filter, AssetDataList);
+	
+	BiomesArray.Empty();
+	for (const auto& AssetData : AssetDataList)
+	{
+		UBiomDataAsset* BiomeData = Cast<UBiomDataAsset>(AssetData.GetAsset());
+		if (BiomeData)
+		{
+			BiomesArray.Add(BiomeData);
+		}
+	}
+}
+
+void ACubeGenerator::InitializeBiomeMap()
+{		
+	BiomesLUTArray.SetNumUninitialized(BiomesArraySize);
+	double StartTime = FPlatformTime::Seconds();
+	for (int temp = -100; temp < 100; ++temp)
+	{
+		for (int hum = -100; hum < 100; ++hum)
+		{				
+			GetLUTData(temp,hum)=CalculateBiomWeights(temp,hum);
+		}
+	}
+	double EndTime = FPlatformTime::Seconds();
+	double TimePassedMs = (EndTime - StartTime) * 1000.0; // Переводим в миллисекунды
+
+	// Выводим результат в Output Log
+	UE_LOG(LogTemp, Warning, TEXT("InitializeBiomeMap (Parallel) took: %f ms"), TimePassedMs);
+}
+
+FBiomLUTMap ACubeGenerator::CalculateBiomWeights(int T, int H)
+{	
+	float fTemp=T/100.0f;
+	float fHum=H/100.0f;
+	float TotalWeight=0;
+	float MaxWeight=0;
+	float WeightedScaleSum = 0.0f;
+	float WeightedOffsetSum = 0.0f;
+	UBiomDataAsset* WinnerBiome=nullptr;
+	for (const auto& Biome : BiomesArray)
+	{
+		float Weight =FMath::Square(Biome->TargetTemperature-fTemp)+FMath::Square(Biome->TargetHumidity-fHum);
+		if (Weight<0.01f)
+		{
+			return FBiomLUTMap{Biome->HeightModifier,Biome->VerticalScale,Biome};
+		}		
+		float W = 1.0f / (Weight * Weight);
+		WeightedScaleSum += Biome->VerticalScale * W;
+		WeightedOffsetSum += Biome->HeightModifier * W;
+		TotalWeight+=W;
+		if (W>MaxWeight)
+		{
+			MaxWeight=W;
+			WinnerBiome=Biome;
+		}
+	}
+	FBiomLUTMap BlendedBiomeData;
+	BlendedBiomeData.VerticalScale = WeightedScaleSum / TotalWeight;
+	BlendedBiomeData.HeightOffset = WeightedOffsetSum / TotalWeight;
+	BlendedBiomeData.Biome = WinnerBiome;
+	return BlendedBiomeData; 
+}
+
 void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
 {
 	Noise.SetSeed(Seed);           // Seed для разнообразия
@@ -102,7 +181,7 @@ float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 	return 1.0f - t * t; // плавно затухает к поверхности
 }
 
-int ACubeGenerator::mapHeight(Noises noises)
+int ACubeGenerator::mapHeight(FNoises noises)
 {		
 	float cont = ContinentalnessCurve->GetFloatValue(noises.ContNoise);
 	float baseVariation = noises.PeaksValleys * 4.0f;
@@ -219,21 +298,9 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 		{			
 			int worldX = Data.Coord.x*CHUNK_X+x;
 			int worldY = Data.Coord.y*CHUNK_Y+y;
-			Noises noises;
+			FNoises noises;
 			noises.PeaksValleys = PeaksValleysNoise.GetNoise((float)worldX,(float)worldY);
-			noises.ContNoise = ContNoise.GetNoise((float)worldX,(float)worldY);
-			static float contMax=0;
-			static float contMin=0;
-			if (noises.ContNoise > contMax)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Max noise noise %f"),noises.ContNoise);
-				contMax = noises.ContNoise;
-			}
-			if (noises.ContNoise < contMin)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Min noise noise %f"),noises.ContNoise);
-				contMin = noises.ContNoise;
-			}
+			noises.ContNoise = ContNoise.GetNoise((float)worldX,(float)worldY);			
 			noises.Bedrock = BedrockNoise.GetNoise((float)worldX,(float)worldY);
 			noises.CavesRoom = CavesRoomNoise.GetNoise((float)worldX,(float)worldY);
 			noises.CavesTunnel = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
@@ -289,40 +356,9 @@ int ACubeGenerator::CalculateBlockHeight(float value)
 	return val==0 ? 1 : val;
 }
 
-void ACubeGenerator::GenerateSurfaceLayer(int z, Noises& noises,FChunkBuildData& Data,int x,int y)
+void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)
 {	
-	BlockType type=BlockType::Air;
-	if (noises.ContNoise>=Bioms.Desert.FromValue && noises.ContNoise<Bioms.Desert.ToValue) //desert
-	{
-		type=Bioms.Desert.BlockTopping;	
-	}
-	else if (noises.ContNoise>Bioms.Plain.FromValue && noises.ContNoise<Bioms.Plain.ToValue) //plain
-	{
-		type=Bioms.Plain.BlockTopping;
-	}
-	else if (noises.ContNoise>Bioms.Mountains.FromValue && noises.ContNoise<=Bioms.Mountains.ToValue)//mountains
-	{
-		type=Bioms.Mountains.BlockTopping;	
-	}	
-	int layers = CalculateBlockHeight(noises.ContNoise);
-	/*if (noises.ContNoise>=Bioms.Desert.ToValue && noises.ContNoise<=Bioms.Plain.FromValue) //between desert and plain
-	{
-		if (layers%2==0)
-			type=Bioms.Desert.BlockTopping;
-		else
-			type=Bioms.Plain.BlockTopping;
-	}
-	if (noises.ContNoise>=Bioms.Plain.ToValue && noises.ContNoise<=Bioms.Mountains.FromValue) //between desert and plain
-	{
-		if (layers%2==0)
-			type=Bioms.Plain.BlockTopping;
-		else
-			type=Bioms.Mountains.BlockTopping;
-	}*/
-	for (int zz = 0; zz < layers; ++zz)
-	{
-		Data.SetBlock(x,y,z-zz,type);
-	}
+	
 }
 
 void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing)
