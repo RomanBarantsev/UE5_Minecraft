@@ -5,10 +5,13 @@
 
 #include "BreakableCube.h"
 #include "GreedyMeshing.h"
+#include "IImageWrapper.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Minecraft/BiomDataAsset.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/FChunkBuildData.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
 class UProceduralMeshComponent;
@@ -63,6 +66,8 @@ void ACubeGenerator::BeginPlay()
 	Super::BeginPlay();
 	LoadAllBioms();
 	InitializeBiomeMap();
+	SaveLUTToXml();
+	VisualizeBiomeLUT();
 	LoadLayers();
 	//time start
 	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
@@ -115,13 +120,21 @@ void ACubeGenerator::InitializeBiomeMap()
 {		
 	BiomesLUTArray.SetNumUninitialized(BiomesArraySize);
 	double StartTime = FPlatformTime::Seconds();
-	for (int temp = -100; temp < 100; ++temp)
+	ParallelFor(BiomesArraySize, [&](int32 i)
 	{
-		for (int hum = -100; hum < 100; ++hum)
+		int32 tempIndex = i / 200;
+		int32 humIndex = i % 200;
+		int32 T = tempIndex - 100;
+		int32 H = humIndex - 100;
+		BiomesLUTArray[i]=CalculateBiomWeights(T,H);
+	});
+	/*for (int temp = -100; temp < 100; ++temp)
+	{
+		for (int hum = -100; hum < 100; ++hum) 
 		{				
 			GetLUTData(temp,hum)=CalculateBiomWeights(temp,hum);
 		}
-	}
+	}*/
 	double EndTime = FPlatformTime::Seconds();
 	double TimePassedMs = (EndTime - StartTime) * 1000.0; // Переводим в миллисекунды
 
@@ -143,11 +156,11 @@ FBiomLUTMap ACubeGenerator::CalculateBiomWeights(int T, int H)
 		float Weight =FMath::Square(Biome->TargetTemperature-fTemp)+FMath::Square(Biome->TargetHumidity-fHum);
 		if (Weight<0.01f)
 		{
-			return FBiomLUTMap{Biome->HeightModifier,Biome->VerticalScale,Biome};
+			return FBiomLUTMap{Biome->Offset,Biome->VerticalScale,Biome};
 		}		
 		float W = 1.0f / (Weight * Weight);
 		WeightedScaleSum += Biome->VerticalScale * W;
-		WeightedOffsetSum += Biome->HeightModifier * W;
+		WeightedOffsetSum += Biome->Offset * W;
 		TotalWeight+=W;
 		if (W>MaxWeight)
 		{
@@ -160,6 +173,115 @@ FBiomLUTMap ACubeGenerator::CalculateBiomWeights(int T, int H)
 	BlendedBiomeData.HeightOffset = WeightedOffsetSum / TotalWeight;
 	BlendedBiomeData.Biome = WinnerBiome;
 	return BlendedBiomeData; 
+}
+
+void ACubeGenerator::VisualizeBiomeLUT()
+{
+    int32 Size = 200;
+    
+    // 1. Создаем текстуру (для отображения в движке, если нужно)
+    UTexture2D* DebugTexture = UTexture2D::CreateTransient(Size, Size, PF_B8G8R8A8);
+    if (!DebugTexture) return;
+
+    // Подготавливаем массив цветов для сохранения в файл
+    TArray<FColor> OutPixels;
+    OutPixels.SetNum(BiomesArraySize);
+
+    // 2. Проходим по данным и формируем цвета
+    for (int32 i = 0; i < BiomesArraySize; ++i)
+    {
+        FBiomLUTMap& LUTData = BiomesLUTArray[i];
+        FColor PixelColor = FColor::Black;
+
+        if (LUTData.Biome)
+        {
+            FString Name = LUTData.Biome->GetName();
+            
+            // Логика раскраски (можно расширить под твои биомы)
+            if (Name.Contains(TEXT("Desert")))      PixelColor = FColor::Yellow;
+            else if (Name.Contains(TEXT("Tundra")))  PixelColor = FColor::Blue;
+            else if (Name.Contains(TEXT("Plains")))  PixelColor = FColor::Cyan;
+            else if (Name.Contains(TEXT("Forest")))  PixelColor = FColor::Green;
+            else if (Name.Contains(TEXT("Mountain"))) PixelColor = FColor::White;
+            else PixelColor = FColor::Orange; // Для неизвестных биомов
+        }
+        else
+        {
+            // Если биом не определен, пусть будет серым
+            PixelColor = FColor(50, 50, 50);
+        }
+
+        OutPixels[i] = PixelColor;
+    }
+
+    // 3. Записываем данные в Transient текстуру (для GPU)
+    FTexture2DMipMap& Mip = DebugTexture->GetPlatformData()->Mips[0];
+    void* TextureData = Mip.BulkData.Lock(LOCK_READ_WRITE);
+    FMemory::Memcpy(TextureData, OutPixels.GetData(), OutPixels.Num() * sizeof(FColor));
+    Mip.BulkData.Unlock();
+    DebugTexture->UpdateResource();
+
+    // 4. Сохранение в PNG файл
+    FString FilePath = FPaths::ProjectSavedDir() + TEXT("Screenshots/BiomeLUT.png");
+
+    IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+    TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+
+    // PNG ожидает RGBA или BGRA. FColor — это обычно BGRA в памяти Windows.
+    if (ImageWrapper.IsValid() && ImageWrapper->SetRaw(OutPixels.GetData(), OutPixels.Num() * sizeof(FColor), Size, Size, ERGBFormat::BGRA, 8))
+    {
+        if (FFileHelper::SaveArrayToFile(ImageWrapper->GetCompressed(), *FilePath))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Картинка успешно сохранена в: %s"), *FilePath);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("Не удалось записать файл на диск!"));
+        }
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("Biome LUT Visualization Complete. Generated 200x200 map."));
+}
+
+void ACubeGenerator::SaveLUTToXml()
+{
+	double StartTime = FPlatformTime::Seconds();
+
+	// 1. Заголовок XML
+	FString XmlContent = TEXT("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+	XmlContent += TEXT("<BiomeLUT>\n");
+
+	// Резервируем память, чтобы избежать частых переаллокаций строки (примерно 150 байт на запись)
+	XmlContent.Reserve(BiomesArraySize * 150);
+
+	for (int32 i = 0; i < BiomesArraySize; ++i)
+	{
+		const FBiomLUTMap& Data = BiomesLUTArray[i];
+        
+		int32 T = (i / 200) - 100;
+		int32 H = (i % 200) - 100;
+		FString BiomeName = Data.Biome ? Data.Biome->GetName() : TEXT("None");
+
+		// Формируем узел для каждой ячейки
+		XmlContent += FString::Printf(TEXT("  <Entry i=\"%d\">\n"), i);
+		XmlContent += FString::Printf(TEXT("    <Temp>%d</Temp>\n"), T);
+		XmlContent += FString::Printf(TEXT("    <Hum>%d</Hum>\n"), H);
+		XmlContent += FString::Printf(TEXT("    <Biome>%s</Biome>\n"), *BiomeName);
+		XmlContent += FString::Printf(TEXT("    <Scale>%.4f</Scale>\n"), Data.VerticalScale);
+		XmlContent += FString::Printf(TEXT("    <Offset>%.4f</Offset>\n"), Data.HeightOffset);
+		XmlContent += TEXT("  </Entry>\n");
+	}
+
+	XmlContent += TEXT("</BiomeLUT>");
+
+	// 2. Сохраняем в папку Saved/Logs
+	FString FilePath = FPaths::ProjectLogDir() + TEXT("BiomeLUT_Data.xml");
+    
+	if (FFileHelper::SaveStringToFile(XmlContent, *FilePath))
+	{
+		double EndTime = FPlatformTime::Seconds();
+		UE_LOG(LogTemp, Warning, TEXT("XML saved (%.2f ms): %s"), (EndTime - StartTime) * 1000.0, *FilePath);
+	}
 }
 
 void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
@@ -306,7 +428,7 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 			noises.CavesTunnel = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
 			noises.Erosion = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
 			int height = mapHeight(noises);
-			//GenerateSurfaceLayer(height,noises,Data, x, y);
+			GenerateSurfaceLayer(height,noises,Data, x, y);
 			Data.SetSurfaceHeight(x,y,height);
 		}
 	}
@@ -347,13 +469,6 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 			}
 		}
 	}
-}
-
-int ACubeGenerator::CalculateBlockHeight(float value)
-{
-	value=FMath::Abs(fmod(value,0.5));
-	int val = static_cast<int>(value/delimiterChunkHeight);
-	return val==0 ? 1 : val;
 }
 
 void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)

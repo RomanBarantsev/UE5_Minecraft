@@ -97,7 +97,9 @@ protected:
 	void LoadAllBioms();
 	void InitializeBiomeMap();
 	FBiomLUTMap CalculateBiomWeights(int T, int H);
-	
+	void VisualizeBiomeLUT();
+	void SaveLUTToXml();
+
 	FastNoiseLite CavesRoomNoise;
 	FastNoiseLite CavesTunnelNoise;
 	FastNoiseLite ContNoise;
@@ -135,7 +137,6 @@ private:
 	void RemoveChunk(FChunkCoord coord);
 	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateCaves(FChunkBuildData& Data);
-	int CalculateBlockHeight(float value);	
 	void GenerateSurfaceLayer(int z, FNoises& noises, FChunkBuildData& Data, int x, int y);
 	void FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing);
 	
