@@ -3,15 +3,16 @@
 
 #include "CubeGenerator.h"
 
-#include "BreakableCube.h"
 #include "GreedyMeshing.h"
 #include "IImageWrapper.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Minecraft/BiomDataAsset.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/FChunkBuildData.h"
-#include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
+#include "NoiseManagerSubSystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
 class UProceduralMeshComponent;
@@ -25,50 +26,22 @@ ACubeGenerator::ACubeGenerator()
 		
 }
 
-void ACubeGenerator::LoadLayers()
-{
-	CavesRoomParams.rowName="CavesRoom";
-	FastNoises.Add(&CavesRoomNoise,FText::FromName(CavesRoomParams.rowName));
-	CavesTunnelParams.rowName="CavesTunnel";
-	FastNoises.Add(&CavesTunnelNoise,FText::FromName(CavesTunnelParams.rowName));	
-	
-	ContParams.rowName="Continentalness";
-	FastNoises.Add(&ContNoise,FText::FromName(ContParams.rowName));
-	PeaksValleysParams.rowName="PeaksValleys";
-	FastNoises.Add(&PeaksValleysNoise,FText::FromName(PeaksValleysParams.rowName));
-	BedrockParams.rowName="Bedrock";
-	FastNoises.Add(&BedrockNoise,FText::FromName(BedrockParams.rowName));
-	BedrockParams.rowName="Erosion";
-	FastNoises.Add(&ErosionNoise,FText::FromName(ErosionParams.rowName));
-	
-	LoadNoiseParams(CavesRoomNoise,CavesRoomParams);
-	LoadNoiseParams(CavesTunnelNoise,CavesTunnelParams);
-	
-	LoadNoiseParams(ContNoise,ContParams);
-	LoadNoiseParams(PeaksValleysNoise,PeaksValleysParams);
-	LoadNoiseParams(ErosionNoise,ErosionParams);
-	
-	LoadNoiseParams(BedrockNoise,BedrockParams);
-	
-	SetNoiseParams(CavesRoomNoise,CavesRoomParams, FastNoiseLite::NoiseType_Perlin);
-	SetNoiseParams(CavesTunnelNoise,CavesTunnelParams, FastNoiseLite::NoiseType_Perlin);	
-	
-	SetNoiseParams(ContNoise,ContParams, FastNoiseLite::NoiseType_Perlin);
-	SetNoiseParams(PeaksValleysNoise,PeaksValleysParams, FastNoiseLite::NoiseType_Perlin);
-	SetNoiseParams(ErosionNoise,ErosionParams, FastNoiseLite::NoiseType_Perlin);
-	
-	SetNoiseParams(BedrockNoise,BedrockParams, FastNoiseLite::NoiseType_Perlin);	
-}
 
 // Called when the game starts or when spawned
 void ACubeGenerator::BeginPlay()
 {
 	Super::BeginPlay();
+	NoiseManager = GetGameInstance()->GetSubsystem<UNoiseManagerSubSystem>();
+	if (!NoiseManager)
+		UKismetSystemLibrary::QuitGame(GetWorld(), UGameplayStatics::GetPlayerController(GetWorld(),0), EQuitPreference::Quit, false);	
+	FastNoises = NoiseManager->GetNoises();
 	LoadAllBioms();
 	InitializeBiomeMap();
+#ifdef  UE_EDITOR
 	SaveLUTToXml();
 	VisualizeBiomeLUT();
-	LoadLayers();
+#endif
+	
 	//time start
 	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
 	//time end
@@ -128,13 +101,6 @@ void ACubeGenerator::InitializeBiomeMap()
 		int32 H = humIndex - 100;
 		BiomesLUTArray[i]=CalculateBiomWeights(T,H);
 	});
-	/*for (int temp = -100; temp < 100; ++temp)
-	{
-		for (int hum = -100; hum < 100; ++hum) 
-		{				
-			GetLUTData(temp,hum)=CalculateBiomWeights(temp,hum);
-		}
-	}*/
 	double EndTime = FPlatformTime::Seconds();
 	double TimePassedMs = (EndTime - StartTime) * 1000.0; // Переводим в миллисекунды
 
@@ -284,16 +250,6 @@ void ACubeGenerator::SaveLUTToXml()
 	}
 }
 
-void ACubeGenerator::SetNoiseParams(FastNoiseLite& Noise,FNoisesParams params,FastNoiseLite::NoiseType noiseType)
-{
-	Noise.SetSeed(Seed);           // Seed для разнообразия
-	Noise.SetFrequency(params.Scale);   // Масштаб шума (аналог Scale)
-	Noise.SetFractalOctaves(params.Octaves);    // 4 октавы для детализации
-	Noise.SetFractalGain(params.Persistence);   // Затухание амплитуды (Persistence)
-	Noise.SetFractalLacunarity(params.Lacunarity); // Рост частоты (Lacunarity)
-	Noise.SetNoiseType(noiseType); // Тип шума — Perlin
-	Noise.SetFractalType(FastNoiseLite::FractalType_FBm);
-}
 
 float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 {
@@ -303,37 +259,57 @@ float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 	return 1.0f - t * t; // плавно затухает к поверхности
 }
 
-int ACubeGenerator::mapHeight(FNoises noises)
-{		
-	float cont = ContinentalnessCurve->GetFloatValue(noises.ContNoise);
-	float baseVariation = noises.PeaksValleys * 4.0f;
-	float height = cont + baseVariation;
-	
-	float erosion = ErosionCurve->GetFloatValue(noises.Erosion);
-	float mountainHeight = noises.PeaksValleys * erosion * 32.0f;
-	float mountainWeight = FMath::Max(0.0f, noises.ContNoise); 
-	float finalHeight = height + (mountainHeight * FMath::Pow(mountainWeight, 2.0f));
-	//float height = PeaksValleysCurve->GetFloatValue(noises.ContNoise+noises.PeaksValleys+noises.PeaksValleys);
-	return  FMath::Clamp((int)finalHeight, 1, CHUNK_Z - 2);
-}
-
-
-void ACubeGenerator::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params)
+FInterpolatedBiomeData ACubeGenerator::GetInterpolatedLUTData(float T, float H) 
 {
-	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>(params.rowName,"name");	
-	if (Row)
-	{
-		params.Scale = Row->Scale;
-		params.Octaves = Row->Octaves;
-		params.Persistence = Row->Persistence;
-		params.Lacunarity = Row->Lacunarity;
-	}
+	// 1. Переводим [-1, 1] в координаты сетки [0, 199]
+	float GridT = (T + 1.0f) * 0.5f * 199.0f;
+	float GridH = (H + 1.0f) * 0.5f * 199.0f;
+
+	// 2. Находим индексы четырех соседних ячеек
+	int32 T0 = FMath::FloorToInt(GridT);
+	int32 T1 = FMath::Min(T0 + 1, 199);
+	int32 H0 = FMath::FloorToInt(GridH);
+	int32 H1 = FMath::Min(H0 + 1, 199);
+
+	// 3. Вычисляем веса смешивания (дробная часть)
+	float FracT = GridT - T0;
+	float FracH = GridH - H0;
+
+	// 4. Берем данные из 4-х точек	
+	auto& D00 = BiomesLUTArray[T0 * 200 + H0];
+	auto& D01 = BiomesLUTArray[T0 * 200 + H1];
+	auto& D10 = BiomesLUTArray[T1 * 200 + H0];
+	auto& D11 = BiomesLUTArray[T1 * 200 + H1];
+
+	// 5. Билинейная интерполяция Scale
+	float S0 = FMath::Lerp(D00.VerticalScale, D01.VerticalScale, FracH);
+	float S1 = FMath::Lerp(D10.VerticalScale, D11.VerticalScale, FracH);
+	float FinalScale = FMath::Lerp(S0, S1, FracT);
+
+	// 6. Билинейная интерполяция Offset
+	float O0 = FMath::Lerp(D00.HeightOffset, D01.HeightOffset, FracH);
+	float O1 = FMath::Lerp(D10.HeightOffset, D11.HeightOffset, FracH);
+	float FinalOffset = FMath::Lerp(O0, O1, FracT);
+
+	return { FinalScale, FinalOffset };
 }
 
+int ACubeGenerator::CalculateHeight(FNoises noises)
+{
+	
+	float BaseHeight = ContinentalnessCurve->GetFloatValue(noises.Continentalness);
+	float Erosion = (noises.Erosion + 1.0f) * 0.5;
+	float Peaks = PeaksValleysCurve->GetFloatValue(noises.PeaksValleys);
+	//Peaks = FMath::Pow(Peaks, Erosion);
+	float Height = BaseHeight +	Peaks*Erosion;
+	FInterpolatedBiomeData Biome = GetInterpolatedLUTData(noises.Temperature, noises.Humidity);
+	Height =Height * Biome.VerticalScale +Biome.HeightOffset;	
+
+	return FMath::Clamp(FMath::FloorToInt(Height), 1, CHUNK_Z - 2);
+}
 
 void ACubeGenerator::UpdateChunks(FVector coord)
 {
-	//PrintNoises(FMath::Abs(coord.X),FMath::Abs(coord.Y),FMath::Abs(coord.Z));
 	double TStart = FPlatformTime::Seconds();
 	if (!ChunksForRemote.IsEmpty())
 	{
@@ -421,14 +397,20 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 			int worldX = Data.Coord.x*CHUNK_X+x;
 			int worldY = Data.Coord.y*CHUNK_Y+y;
 			FNoises noises;
-			noises.PeaksValleys = PeaksValleysNoise.GetNoise((float)worldX,(float)worldY);
-			noises.ContNoise = ContNoise.GetNoise((float)worldX,(float)worldY);			
-			noises.Bedrock = BedrockNoise.GetNoise((float)worldX,(float)worldY);
-			noises.CavesRoom = CavesRoomNoise.GetNoise((float)worldX,(float)worldY);
-			noises.CavesTunnel = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
-			noises.Erosion = CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
-			int height = mapHeight(noises);
-			GenerateSurfaceLayer(height,noises,Data, x, y);
+			
+			noises.PeaksValleys = FastNoises.PeaksValleysNoise.GetNoise((float)worldX,(float)worldY);
+			noises.Continentalness = FastNoises.ContinentalnessNoise.GetNoise((float)worldX,(float)worldY);			
+			noises.Bedrock = FastNoises.BedrockNoise.GetNoise((float)worldX,(float)worldY);
+			noises.CavesRoom = FastNoises.CavesRoomNoise.GetNoise((float)worldX,(float)worldY);
+			noises.CavesTunnel = FastNoises.CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
+			noises.Erosion = FastNoises.ErosionNoise.GetNoise((float)worldX,(float)worldY);
+			noises.Humidity = FastNoises.HumidityNoise.GetNoise((float)worldX,(float)worldY);
+			noises.Temperature = FastNoises.TemperatureNoise.GetNoise((float)worldX,(float)worldY);
+			int height = CalculateHeight(noises);
+			if (!BiomesArray.IsEmpty()) 
+				{
+					GenerateSurfaceLayer(height,noises,Data, x, y);
+				}
 			Data.SetSurfaceHeight(x,y,height);
 		}
 	}
@@ -445,7 +427,7 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 		{
 			int index2D = x + y * CHUNK_X;
 			float fy = static_cast<float>(yPerlin);
-			float bedrockNoise = BedrockNoise.GetNoise(fx,fy);
+			float bedrockNoise = FastNoises.BedrockNoise.GetNoise(fx,fy);
 			int bedrockTop = BEDROCK_BASE + static_cast<int>(((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
 			int height = Data.GetSurfaceHeight(x,y);
 			for (int z = 0; z < height; ++z)
@@ -455,8 +437,8 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 					Data.SetBlock(x,y,z,BlockType::Cobblestone);
 					continue;
 				}
-				float Room = CavesRoomNoise.GetNoise(fx, fy, static_cast<float>(z));
-				float Tunnel  = CavesTunnelNoise.GetNoise(fx, fy, static_cast<float>(z));
+				float Room = FastNoises.CavesRoomNoise.GetNoise(fx, fy, static_cast<float>(z));
+				float Tunnel  = FastNoises.CavesTunnelNoise.GetNoise(fx, fy, static_cast<float>(z));
 				float Mask = GetHeightMask(z, 1, height - 6);
 				float Density =
 					Tunnel * 1.2f +     // тоннели важнее
@@ -473,7 +455,16 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 
 void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)
 {	
-	
+	auto LUTData = GetLUTData(noises.Temperature,noises.Humidity);
+	auto BiomeLayers = LUTData.Biome->SurfaceLayers;
+	for (auto Layer : BiomeLayers)
+	{
+		for (int i = z; i > z-Layer.Key; --i)
+		{
+			Data.SetBlock(x,y,z,Layer.Value);
+		}
+		z-=Layer.Key;
+	}	
 }
 
 void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing)
@@ -566,17 +557,4 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	}*/
 	double TEnd = FPlatformTime::Seconds();
 	//UE_LOG(LogTemp, Warning, TEXT("ReBuilding chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
-}
-
-TMap<FastNoiseLite*, FText> ACubeGenerator::GetFastNoises()
-{
-	return FastNoises;
-}
-
-void ACubeGenerator::PrintNoises(int x,int y,int z)
-{
-	for (auto Noise : FastNoises)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Noise: %s value: %f"),*Noise.Value.ToString(),Noise.Key->GetNoise((float)x,(float)y,(float)z));
-	}
 }

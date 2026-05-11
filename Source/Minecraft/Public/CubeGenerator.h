@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "NoiseManagerSubSystem.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
-#include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/FChunkBuildData.h"
 #include "CubeGenerator.generated.h"
 
@@ -14,41 +14,9 @@ class FGreedyMeshing;
 class UMinecraftProceduralMeshComponent;
 class UDataTable;
 
-USTRUCT(BlueprintType)
-struct FPerlinNoiseBiom : public FTableRowBase
-{
-	GENERATED_BODY()
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
-	float Scale=0;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
-	float Octaves;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
-	float Persistence;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
-	float Lacunarity;
-};
-
-
-USTRUCT(BlueprintType)
-struct FNoisesParams
-{
-	GENERATED_BODY()
-public:	
-	float Scale;
-	float Octaves;
-	float Persistence;
-	float Lacunarity;
-	FName rowName;
-};
-
-struct FNoises
-{
-	float CavesRoom;
-	float CavesTunnel;
-	float ContNoise;
-	float PeaksValleys;
-	float Bedrock;
-	float Erosion;
+struct FInterpolatedBiomeData {
+	float VerticalScale;
+	float HeightOffset;
 };
 
 USTRUCT()
@@ -74,66 +42,71 @@ class MINECRAFT_API ACubeGenerator : public AActor
 private:
 	const int chunkDelimiter=4;
 	const float delimiterChunkHeight=0.05;
-
+	UPROPERTY()
+	UNoiseManagerSubSystem* NoiseManager;
+	
 public:
 	// Sets default values for this actor's properties
 	ACubeGenerator();
 protected:
-	void LoadLayers();
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	
-	UPROPERTY()
-	TArray<UBiomDataAsset*> BiomesArray;	
-	UPROPERTY()
-	TArray<FBiomLUTMap> BiomesLUTArray;	
-	const int BiomesArraySize = 40000;
-	
-	FBiomLUTMap& GetLUTData(int T, int H) {
-		return BiomesLUTArray[(T + 100) * 200 + (H + 100)];
-	}
-	
-	void LoadAllBioms();
-	void InitializeBiomeMap();
-	FBiomLUTMap CalculateBiomWeights(int T, int H);
-	void VisualizeBiomeLUT();
-	void SaveLUTToXml();
-
-	FastNoiseLite CavesRoomNoise;
-	FastNoiseLite CavesTunnelNoise;
-	FastNoiseLite ContNoise;
-	FastNoiseLite PeaksValleysNoise;
-	FastNoiseLite BedrockNoise;
-	FastNoiseLite ErosionNoise;
-	TMap<FastNoiseLite*,FText> FastNoises;
-	FNoisesParams CavesRoomParams;
-	FNoisesParams CavesTunnelParams;
-	FNoisesParams ContParams;
-	FNoisesParams PeaksValleysParams;
-	FNoisesParams BedrockParams;
-	FNoisesParams ErosionParams;
-		
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* PeaksValleysCurve;
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ErosionCurve;
+	FFastNoises FastNoises;
+	UPROPERTY()
+	TArray<UBiomDataAsset*> BiomesArray;	
+	UPROPERTY()
+	TArray<FBiomLUTMap> BiomesLUTArray;	
+	const int BiomesArraySize = 40000;
 	
-	UPROPERTY(EditAnywhere)
-	int Seed=1343;	
-	UPROPERTY(EditAnywhere)
-	UDataTable* PerlinNoiseTable;
+	FBiomLUTMap& GetLUTData(float T, float H) 
+	{
+		// 1. Нормализуем входящие значения из [-1, 1] в [0, 1]
+		// (Value + 1.0) * 0.5 даст нам диапазон от 0.0 до 1.0
+		float NormalizedT = (T + 1.0f) * 0.5f;
+		float NormalizedH = (H + 1.0f) * 0.5f;
+
+		// 2. Масштабируем до размера сетки (0-199)
+		// Используем FMath::Clamp, чтобы избежать вылета за пределы массива при T или H = 1.0
+		int32 IndexT = FMath::Clamp(FMath::FloorToInt(NormalizedT * 200.0f), 0, 199);
+		int32 IndexH = FMath::Clamp(FMath::FloorToInt(NormalizedH * 200.0f), 0, 199);
+
+		// 3. Вычисляем финальный индекс в одномерном массиве
+		// Формула для 2D сетки: Row * RowSize + Column
+		int32 FinalIndex = (IndexT * 200) + IndexH;
+
+		// Проверка на валидность массива перед возвратом (защита от краша)
+		if (BiomesLUTArray.IsValidIndex(FinalIndex))
+		{
+			return BiomesLUTArray[FinalIndex];
+		}
+
+		// Возвращаем что-то по умолчанию, если индекс невалиден
+		return BiomesLUTArray[0]; 
+	}
+	
+	void LoadAllBioms();
+	void InitializeBiomeMap();
+	FBiomLUTMap CalculateBiomWeights(int T, int H);
+	void VisualizeBiomeLUT();
+	void SaveLUTToXml();	
+	
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> DestroyedBlockClass;
 private:
-	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
+	
 	float GetHeightMask(int z, int minZ, int maxZ);
-	int mapHeight(FNoises noises);
-	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
+	FInterpolatedBiomeData GetInterpolatedLUTData(float T, float H);
+	int CalculateHeight(FNoises noises);
 	void RemoveChunk(FChunkCoord coord);
 	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateCaves(FChunkBuildData& Data);
@@ -167,8 +140,5 @@ public:
 public:
 	int GetSurfaceHigh(FVector vec);
 	void RemoveBlock(FHitResult hit,UMinecraftProceduralMeshComponent* mesh);
-	TMap<FastNoiseLite*,FText> GetFastNoises();
 	float EPS = 0.1f;	
-private:
-	void PrintNoises(int x, int y, int z);
 };
