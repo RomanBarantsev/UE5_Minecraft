@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "NoiseManagerSubSystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
 #include "MC_Overlay.generated.h"
@@ -25,5 +26,8 @@ class MINECRAFT_API UMC_Overlay : public UUserWidget
 	virtual void NativeConstruct() override;
 	TMap<FastNoiseLite*,FText> NoisesMap;
 	FTimerHandle TimerUpdateNoises;
+	UPROPERTY()
 	TArray<UTextBlock*> TextBlocks;
+	UPROPERTY()
+	UNoiseManagerSubSystem* NoiseManager;
 };

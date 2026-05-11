@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "MC_Overlay.h"
+#include "UI/MC_Overlay.h"
 
 #include "CubeGenerator.h"
 #include "Components/HorizontalBox.h"
@@ -21,11 +21,10 @@ void UMC_Overlay::SetCoordinates(int x, int y, int z)
 void UMC_Overlay::NativeConstruct()
 {
 	Super::NativeConstruct();
-	AActor* Actor = UGameplayStatics::GetActorOfClass(GetWorld(),TSubclassOf<class ACubeGenerator>());
-	ACubeGenerator* CubeGenerator = Cast<ACubeGenerator>(Actor);
-	if (CubeGenerator)
+	NoiseManager = GetGameInstance()->GetSubsystem<UNoiseManagerSubSystem>();
+	if (NoiseManager)
 	{
-		NoisesMap = CubeGenerator->GetFastNoises();
+		NoisesMap = NoiseManager->GetNoisesMap();
 		if (!NoisesMap.IsEmpty())
 		{
 			for (auto Noise : NoisesMap)
