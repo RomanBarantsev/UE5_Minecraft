@@ -8,6 +8,7 @@
 #include "Components/TextBlock.h"
 #include "MC_Overlay.generated.h"
 
+class AMC_Pawn;
 class FastNoiseLite;
 class UVerticalBox;
 /**
@@ -22,12 +23,13 @@ class MINECRAFT_API UMC_Overlay : public UUserWidget
 	FTimerDynamicDelegate Delegate;
 	UFUNCTION()
 	void UpdateUI();
-	void SetCoordinates(int x, int y,int z);
 	virtual void NativeConstruct() override;
 	TMap<FastNoiseLite*,FText> NoisesMap;
 	FTimerHandle TimerUpdateNoises;
 	UPROPERTY()
-	TArray<UTextBlock*> TextBlocks;
+	TMap<FString,UTextBlock*> TextBlocks;
 	UPROPERTY()
 	UNoiseManagerSubSystem* NoiseManager;
+	UPROPERTY()
+	AMC_Pawn* MC_Pawn;
 };

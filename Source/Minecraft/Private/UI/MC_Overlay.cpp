@@ -3,41 +3,70 @@
 
 #include "UI/MC_Overlay.h"
 
+#include <string>
+
 #include "CubeGenerator.h"
+#include "UnrealWidgetFwd.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/HorizontalBox.h"
 #include "Components/VerticalBox.h"
 #include "Kismet/GameplayStatics.h"
+#include "Minecraft/MC_Pawn.h"
 
 void UMC_Overlay::UpdateUI()
-{
-	
-}
-
-void UMC_Overlay::SetCoordinates(int x, int y, int z)
-{
-	
+{	
+	auto coord = MC_Pawn->GetPlayerVoxelPos();
+	for (auto Noise : NoisesMap)
+	{
+		auto res = TextBlocks.Find(Noise.Value.ToString());
+		if (res && *res)
+		{
+			auto NoiseValue = Noise.Key->GetNoise((float)coord.X, (float)coord.Y);
+			(*res)->SetText(FText::AsNumber(NoiseValue));
+		}
+	}
 }
 
 void UMC_Overlay::NativeConstruct()
 {
+	APawn* PlayerPawn = GetOwningPlayerPawn();
+	MC_Pawn = Cast<AMC_Pawn>(PlayerPawn);
+	if (!MC_Pawn)
+	{		
+		FGenericPlatformMisc::RequestExit(false);
+	}
 	Super::NativeConstruct();
+	if (!VerticalBox)
+	{
+		VerticalBox = WidgetTree->ConstructWidget<UVerticalBox>();
+		WidgetTree->RootWidget = VerticalBox;
+	}	
 	NoiseManager = GetGameInstance()->GetSubsystem<UNoiseManagerSubSystem>();
+	FSlateColor Color(FLinearColor::Black);
 	if (NoiseManager)
 	{
 		NoisesMap = NoiseManager->GetNoisesMap();
 		if (!NoisesMap.IsEmpty())
 		{
 			for (auto Noise : NoisesMap)
-			{
-				UTextBlock* Text = CreateDefaultSubobject<UTextBlock>("Text");
-				UTextBlock* TextName = CreateDefaultSubobject<UTextBlock>("Text");
-				TextBlocks.Add(Text);
-				UHorizontalBox* HorizontalBox = CreateDefaultSubobject<UHorizontalBox>("HorizontalBox");
-				HorizontalBox->AddChild(TextName);
-				HorizontalBox->AddChild(Text);
-				VerticalBox->AddChild(HorizontalBox);			
+			{				
+				UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();	
+				Text->SetColorAndOpacity(Color);
+				UTextBlock* NoiseName = WidgetTree->ConstructWidget<UTextBlock>();
+				NoiseName->SetText(Noise.Value);
+				NoiseName->SetColorAndOpacity(Color);
+				TextBlocks.FindOrAdd(Noise.Value.ToString(),Text);
+				auto HorizBox = WidgetTree->ConstructWidget<UHorizontalBox>();
+				HorizBox->AddChild(NoiseName);
+				HorizBox->AddChild(Text);
+				VerticalBox->AddChild(HorizBox);				
 			}
 		}
 	}
-	GetWorld()->GetTimerManager().SetTimer(TimerUpdateNoises,this,&UMC_Overlay::UpdateUI,1.0f,true);	
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MC_Overlay.cpp - can't find NoiseManager"));
+	}
+	GetWorld()->GetTimerManager().SetTimer(TimerUpdateNoises,this,&UMC_Overlay::UpdateUI,1.0f,true);
+	UpdateUI();
 }
