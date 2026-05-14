@@ -298,7 +298,7 @@ int ACubeGenerator::CalculateHeight(FNoises noises)
 {
 	
 	float BaseHeight = ContinentalnessCurve->GetFloatValue(noises.Continentalness);
-	float Erosion = (noises.Erosion + 1.0f) * 0.5;
+	float Erosion = (noises.Erosion + 1.0f) * 0.5; // 0-1
 	float Peaks = PeaksValleysCurve->GetFloatValue(noises.PeaksValleys);
 	//Peaks = FMath::Pow(Peaks, Erosion);
 	float Height = BaseHeight +	Peaks*Erosion;
