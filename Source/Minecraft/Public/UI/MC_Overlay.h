@@ -32,4 +32,6 @@ class MINECRAFT_API UMC_Overlay : public UUserWidget
 	UNoiseManagerSubSystem* NoiseManager;
 	UPROPERTY()
 	AMC_Pawn* MC_Pawn;
+	UTextBlock* PlayerPos;
+	FVector CurrentCoord;
 };

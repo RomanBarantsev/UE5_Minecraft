@@ -16,6 +16,8 @@
 void UMC_Overlay::UpdateUI()
 {	
 	auto coord = MC_Pawn->GetPlayerVoxelPos();
+	if (CurrentCoord==coord)
+		return;
 	for (auto Noise : NoisesMap)
 	{
 		auto res = TextBlocks.Find(Noise.Value.ToString());
@@ -25,6 +27,13 @@ void UMC_Overlay::UpdateUI()
 			(*res)->SetText(FText::AsNumber(NoiseValue));
 		}
 	}
+	FText PosText = FText::Format(
+	NSLOCTEXT("MyNamespace", "PlayerPosKey", "X: {0} Y: {1} Z: {2}"), 
+	FText::AsNumber(CurrentCoord.X), 
+	FText::AsNumber(CurrentCoord.Y),
+	FText::AsNumber(CurrentCoord.Z));
+	PlayerPos->SetText(PosText);
+	CurrentCoord=coord;
 }
 
 void UMC_Overlay::NativeConstruct()
@@ -67,6 +76,13 @@ void UMC_Overlay::NativeConstruct()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("MC_Overlay.cpp - can't find NoiseManager"));
 	}
-	GetWorld()->GetTimerManager().SetTimer(TimerUpdateNoises,this,&UMC_Overlay::UpdateUI,1.0f,true);
+	
+	auto HorizBox = WidgetTree->ConstructWidget<UHorizontalBox>();
+	PlayerPos = WidgetTree->ConstructWidget<UTextBlock>();
+	PlayerPos->SetColorAndOpacity(Color);
+	HorizBox->AddChild(PlayerPos);
+	VerticalBox->AddChild(HorizBox);
+	
+	GetWorld()->GetTimerManager().SetTimer(TimerUpdateNoises,this,&UMC_Overlay::UpdateUI,0.1f,true);
 	UpdateUI();
 }
