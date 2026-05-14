@@ -34,7 +34,7 @@ void UNoiseManagerSubSystem::LoadLayers()
 	FastNoises.Add(&NS.PeaksValleysNoise,FText::FromName(PeaksValleysParams.rowName));
 	BedrockParams.rowName="Bedrock";
 	FastNoises.Add(&NS.BedrockNoise,FText::FromName(BedrockParams.rowName));
-	BedrockParams.rowName="Erosion";
+	ErosionParams.rowName="Erosion";
 	FastNoises.Add(&NS.ErosionNoise,FText::FromName(ErosionParams.rowName));
 	
 	HumidityParams.rowName="Humidity";
