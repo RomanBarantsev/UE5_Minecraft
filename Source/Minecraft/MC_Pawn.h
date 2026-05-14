@@ -33,6 +33,8 @@ public:
 	UPROPERTY()
 	ACubeGenerator* CubeGenerator;
 	void Redraw();
+	UFUNCTION()
+	FVector GetPlayerVoxelPos();
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 };

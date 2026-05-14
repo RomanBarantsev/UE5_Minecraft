@@ -75,6 +75,15 @@ void AMC_Pawn::Fire()
 	}		
 }
 
+FVector AMC_Pawn::GetPlayerVoxelPos()
+{
+	auto coord = GetActorLocation()/BLOCK_SIZE;
+	coord.X = FMath::FloorToInt(coord.X);
+	coord.Y = FMath::FloorToInt(coord.Y);
+	coord.Z = FMath::FloorToInt(coord.Z);
+	return coord;
+}
+
 // Called to bind functionality to input
 void AMC_Pawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
