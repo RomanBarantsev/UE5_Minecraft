@@ -4,12 +4,10 @@
 #include "CubeGenerator.h"
 
 #include "GreedyMeshing.h"
-#include "IImageWrapper.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Minecraft/BiomDataAsset.h"
 #include "Minecraft/FastNoiseLite.h"
 #include "Minecraft/FChunkBuildData.h"
-#include "IImageWrapperModule.h"
 #include "NoiseManagerSubSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
