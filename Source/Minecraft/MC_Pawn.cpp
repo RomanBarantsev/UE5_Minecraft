@@ -56,7 +56,7 @@ void AMC_Pawn::Tick(float DeltaTime)
 
 void AMC_Pawn::PlaceAboveSurface()
 {
-	auto height = CubeGenerator->GetSurfaceHigh(GetActorLocation());
+	auto height = CubeGenerator->GetSurfaceHighInPos(GetActorLocation());
 	SetActorLocation(GetActorLocation() + FVector(0,0,height*BLOCK_SIZE+PawnSize));
 	UE_LOG(LogTemp,Warning,TEXT("height %d"),height);
 }
