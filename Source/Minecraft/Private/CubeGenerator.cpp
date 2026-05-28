@@ -37,10 +37,6 @@ void ACubeGenerator::BeginPlay()
 	FastNoises = NoiseManager->GetNoises();
 	LoadAllBioms();
 	InitializeBiomeMap();
-#ifdef  UE_EDITOR
-	SaveLUTToXml();
-	VisualizeBiomeLUT();
-#endif
 	
 	//time start
 	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
@@ -140,116 +136,6 @@ FBiomLUTMap ACubeGenerator::CalculateBiomWeights(int T, int H)
 	BlendedBiomeData.Biome = WinnerBiome;
 	return BlendedBiomeData; 
 }
-
-void ACubeGenerator::VisualizeBiomeLUT()
-{
-    int32 Size = 200;
-    
-    // 1. Создаем текстуру (для отображения в движке, если нужно)
-    UTexture2D* DebugTexture = UTexture2D::CreateTransient(Size, Size, PF_B8G8R8A8);
-    if (!DebugTexture) return;
-
-    // Подготавливаем массив цветов для сохранения в файл
-    TArray<FColor> OutPixels;
-    OutPixels.SetNum(BiomesArraySize);
-
-    // 2. Проходим по данным и формируем цвета
-    for (int32 i = 0; i < BiomesArraySize; ++i)
-    {
-        FBiomLUTMap& LUTData = BiomesLUTArray[i];
-        FColor PixelColor = FColor::Black;
-
-        if (LUTData.Biome)
-        {
-            FString Name = LUTData.Biome->GetName();
-            
-            // Логика раскраски (можно расширить под твои биомы)
-            if (Name.Contains(TEXT("Desert")))      PixelColor = FColor::Yellow;
-            else if (Name.Contains(TEXT("Tundra")))  PixelColor = FColor::Blue;
-            else if (Name.Contains(TEXT("Plains")))  PixelColor = FColor::Cyan;
-            else if (Name.Contains(TEXT("Forest")))  PixelColor = FColor::Green;
-            else if (Name.Contains(TEXT("Mountain"))) PixelColor = FColor::White;
-            else PixelColor = FColor::Orange; // Для неизвестных биомов
-        }
-        else
-        {
-            // Если биом не определен, пусть будет серым
-            PixelColor = FColor(50, 50, 50);
-        }
-
-        OutPixels[i] = PixelColor;
-    }
-
-    // 3. Записываем данные в Transient текстуру (для GPU)
-    FTexture2DMipMap& Mip = DebugTexture->GetPlatformData()->Mips[0];
-    void* TextureData = Mip.BulkData.Lock(LOCK_READ_WRITE);
-    FMemory::Memcpy(TextureData, OutPixels.GetData(), OutPixels.Num() * sizeof(FColor));
-    Mip.BulkData.Unlock();
-    DebugTexture->UpdateResource();
-
-    // 4. Сохранение в PNG файл
-    FString FilePath = FPaths::ProjectSavedDir() + TEXT("Screenshots/BiomeLUT.png");
-
-    IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-    TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
-
-    // PNG ожидает RGBA или BGRA. FColor — это обычно BGRA в памяти Windows.
-    if (ImageWrapper.IsValid() && ImageWrapper->SetRaw(OutPixels.GetData(), OutPixels.Num() * sizeof(FColor), Size, Size, ERGBFormat::BGRA, 8))
-    {
-        if (FFileHelper::SaveArrayToFile(ImageWrapper->GetCompressed(), *FilePath))
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Картинка успешно сохранена в: %s"), *FilePath);
-        }
-        else
-        {
-            UE_LOG(LogTemp, Error, TEXT("Не удалось записать файл на диск!"));
-        }
-    }
-
-    UE_LOG(LogTemp, Log, TEXT("Biome LUT Visualization Complete. Generated 200x200 map."));
-}
-
-void ACubeGenerator::SaveLUTToXml()
-{
-	double StartTime = FPlatformTime::Seconds();
-
-	// 1. Заголовок XML
-	FString XmlContent = TEXT("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-	XmlContent += TEXT("<BiomeLUT>\n");
-
-	// Резервируем память, чтобы избежать частых переаллокаций строки (примерно 150 байт на запись)
-	XmlContent.Reserve(BiomesArraySize * 150);
-
-	for (int32 i = 0; i < BiomesArraySize; ++i)
-	{
-		const FBiomLUTMap& Data = BiomesLUTArray[i];
-        
-		int32 T = (i / 200) - 100;
-		int32 H = (i % 200) - 100;
-		FString BiomeName = Data.Biome ? Data.Biome->GetName() : TEXT("None");
-
-		// Формируем узел для каждой ячейки
-		XmlContent += FString::Printf(TEXT("  <Entry i=\"%d\">\n"), i);
-		XmlContent += FString::Printf(TEXT("    <Temp>%d</Temp>\n"), T);
-		XmlContent += FString::Printf(TEXT("    <Hum>%d</Hum>\n"), H);
-		XmlContent += FString::Printf(TEXT("    <Biome>%s</Biome>\n"), *BiomeName);
-		XmlContent += FString::Printf(TEXT("    <Scale>%.4f</Scale>\n"), Data.VerticalScale);
-		XmlContent += FString::Printf(TEXT("    <Offset>%.4f</Offset>\n"), Data.HeightOffset);
-		XmlContent += TEXT("  </Entry>\n");
-	}
-
-	XmlContent += TEXT("</BiomeLUT>");
-
-	// 2. Сохраняем в папку Saved/Logs
-	FString FilePath = FPaths::ProjectLogDir() + TEXT("BiomeLUT_Data.xml");
-    
-	if (FFileHelper::SaveStringToFile(XmlContent, *FilePath))
-	{
-		double EndTime = FPlatformTime::Seconds();
-		UE_LOG(LogTemp, Warning, TEXT("XML saved (%.2f ms): %s"), (EndTime - StartTime) * 1000.0, *FilePath);
-	}
-}
-
 
 float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 {
@@ -360,7 +246,7 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 //UE_LOG(LogTemp, Warning, TEXT("Building chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
 }
 
-int ACubeGenerator::GetSurfaceHigh(FVector vec)
+int ACubeGenerator::GetSurfaceHighInPos(FVector vec)
 {
 	int XChunkCoord = FMath::FloorToInt(vec.X / BLOCK_SIZE);
 	int YChunkCoord = FMath::FloorToInt(vec.Y / BLOCK_SIZE);
@@ -423,9 +309,8 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 	for (int xPerlin = Data.Coord.x*CHUNK_X, x =0; xPerlin <Data.Coord.x*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
 		float fx = static_cast<float>(xPerlin);
-		for (int yPerlin = Data.Coord.y*CHUNK_X, y=0; yPerlin <Data.Coord.y*CHUNK_X+CHUNK_X; yPerlin++,y++)
+		for (int yPerlin = Data.Coord.y*CHUNK_X, y=0; yPerlin <Data.Coord.y*CHUNK_Y+CHUNK_Y; yPerlin++,y++)
 		{
-			int index2D = x + y * CHUNK_X;
 			float fy = static_cast<float>(yPerlin);
 			float bedrockNoise = FastNoises.BedrockNoise.GetNoise(fx,fy);
 			int bedrockTop = BEDROCK_BASE + static_cast<int>(((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
@@ -457,11 +342,13 @@ void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData
 {	
 	auto LUTData = GetLUTData(noises.Temperature,noises.Humidity);
 	auto BiomeLayers = LUTData.Biome->SurfaceLayers;
+	float bedrockNoise = FastNoises.BedrockNoise.GetNoise(static_cast<float>(x),static_cast<float>(y));
+	int bedrockTop = BEDROCK_BASE + static_cast<int>(((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
 	for (auto Layer : BiomeLayers)
 	{
-		for (int i = z; i > z-Layer.Key; --i)
+		for (int i = z; i > z-Layer.Key+bedrockTop; --i)
 		{
-			Data.SetBlock(x,y,z,Layer.Value);
+			Data.SetBlock(x,y,i,Layer.Value);
 		}
 		z-=Layer.Key;
 	}	

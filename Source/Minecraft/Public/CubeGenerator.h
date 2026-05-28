@@ -95,8 +95,6 @@ protected:
 	void LoadAllBioms();
 	void InitializeBiomeMap();
 	FBiomLUTMap CalculateBiomWeights(int T, int H);
-	void VisualizeBiomeLUT();
-	void SaveLUTToXml();	
 	
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
 	UMaterialInterface* Mat;
@@ -138,7 +136,7 @@ public:
 	UFUNCTION()
 	void UpdateChunks(FVector coord);
 public:
-	int GetSurfaceHigh(FVector vec);
+	int GetSurfaceHighInPos(FVector vec);
 	void RemoveBlock(FHitResult hit,UMinecraftProceduralMeshComponent* mesh);
 	float EPS = 0.1f;	
 };
