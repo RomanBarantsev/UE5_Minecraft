@@ -40,7 +40,7 @@ class MINECRAFT_API ACubeGenerator : public AActor
 {
 	GENERATED_BODY()
 private:
-	const int chunkDelimiter=4;
+	const int chunkDeep=8;
 	const float delimiterChunkHeight=0.05;
 	UPROPERTY()
 	UNoiseManagerSubSystem* NoiseManager;
@@ -66,29 +66,21 @@ protected:
 	TArray<FBiomLUTMap> BiomesLUTArray;	
 	const int BiomesArraySize = 40000;
 	
-	FBiomLUTMap& GetLUTData(float T, float H) 
+FBiomLUTMap& GetLUTData(float T, float H) 
 	{
-		// 1. Нормализуем входящие значения из [-1, 1] в [0, 1]
-		// (Value + 1.0) * 0.5 даст нам диапазон от 0.0 до 1.0
 		float NormalizedT = (T + 1.0f) * 0.5f;
 		float NormalizedH = (H + 1.0f) * 0.5f;
 
-		// 2. Масштабируем до размера сетки (0-199)
-		// Используем FMath::Clamp, чтобы избежать вылета за пределы массива при T или H = 1.0
 		int32 IndexT = FMath::Clamp(FMath::FloorToInt(NormalizedT * 200.0f), 0, 199);
 		int32 IndexH = FMath::Clamp(FMath::FloorToInt(NormalizedH * 200.0f), 0, 199);
 
-		// 3. Вычисляем финальный индекс в одномерном массиве
-		// Формула для 2D сетки: Row * RowSize + Column
 		int32 FinalIndex = (IndexT * 200) + IndexH;
 
-		// Проверка на валидность массива перед возвратом (защита от краша)
 		if (BiomesLUTArray.IsValidIndex(FinalIndex))
 		{
 			return BiomesLUTArray[FinalIndex];
 		}
 
-		// Возвращаем что-то по умолчанию, если индекс невалиден
 		return BiomesLUTArray[0]; 
 	}
 	
@@ -117,7 +109,7 @@ private:
 		TSharedPtr<FGreedyMeshing> GreedyMeshing;
 	};
 	void AsyncChunkCreate(TArray<FChunkCoord>& GenerateArray,TArray<FAsyncGenerationResult>& Results);	
-	TArray<FChunkCoord> CoordsToGenerate;
+	TMultiMap<int32,FChunkCoord> CoordsToGenerate;
 	size_t OperationPerTick=1;
 	
 	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> Chunks;

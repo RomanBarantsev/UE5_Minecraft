@@ -44,19 +44,27 @@ void ACubeGenerator::BeginPlay()
 void ACubeGenerator::Tick(float DeltaSeconds)
 {	
 	Super::Tick(DeltaSeconds);	
-	
+	if (CoordsToGenerate.IsEmpty())
+		return;	
 	TArray<FAsyncGenerationResult> Results;
 	Results.SetNum(CoordsToGenerate.Num());
-	if (CoordsToGenerate.IsEmpty())
-		return;
-	
 	TArray<FChunkCoord> GenerateArray;
 	for (int i = 0; i < OperationPerTick; i++)
 	{
-		GenerateArray.Push(CoordsToGenerate.Pop());
+		for (int j = 0; j < chunkDeep*2; ++j)
+		{
+			auto It = CoordsToGenerate.CreateKeyIterator(j);
+			if(It)
+			{
+				FChunkCoord OutCoord = It.Value();
+				It.RemoveCurrent();
+				GenerateArray.Push(OutCoord);
+				break;
+			}		
+			
+		}	
 	}
-	AsyncChunkCreate(GenerateArray,Results);
-	
+	AsyncChunkCreate(GenerateArray,Results);	
 }
 
 void ACubeGenerator::LoadAllBioms()
@@ -194,12 +202,11 @@ int ACubeGenerator::CalculateHeight(FNoises noises)
 
 void ACubeGenerator::UpdateChunks(FVector coord)
 {
-	double TStart = FPlatformTime::Seconds();
 	if (!ChunksForRemote.IsEmpty())
 	{
 		for (auto Chunk : ChunksForRemote)
 		{
-			RemoveChunk(Chunk.Key);
+			RemoveChunk(Chunk.Key); //TODO per tick
 		}
 	}
 	coord/=BLOCK_SIZE;
@@ -208,28 +215,26 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
 	UE_LOG(LogTemp, Warning, TEXT("chunkCoord x %d y %d"),chunkCoord.x,chunkCoord.y);
 	
-	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDelimiter
-	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDelimiter
+	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDeep
+	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDeep
 											|| currentChunkPosition.startPos)
 	{
 		currentChunkPosition.startPos=false;
-		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDelimiter) * chunkDelimiter;
-		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDelimiter) * chunkDelimiter;
+		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDeep) * chunkDeep;
+		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDeep) * chunkDeep;
 		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);
-		ChunksForRemote = Chunks;
-		Chunks.Empty();		
+		ChunksForRemote = Chunks; //TODO shouldn't replace, there can be some chunks to remote.
+		Chunks.Empty();				
 		
-		/*CoordsToGenerate.Add(FChunkCoord{0,0});				
-		Chunks.Add(FChunkCoord{0,0},nullptr);*/
-		
-		for (int x  = chunkCoord.x-chunkDelimiter*2; x < chunkCoord.x+chunkDelimiter*2; ++x)
+		for (int x  = chunkCoord.x-chunkDeep; x < chunkCoord.x+chunkDeep; ++x)
 		{
-			for (int y = chunkCoord.y-chunkDelimiter*2; y < chunkCoord.y+chunkDelimiter*2; ++y)
+			for (int y = chunkCoord.y-chunkDeep; y < chunkCoord.y+chunkDeep; ++y)
 			{
 				FChunkCoord newCoord{x,y};
+				int weight = FMath::Max(FMath::Abs(chunkCoord.x-x),FMath::Abs(chunkCoord.y-y));
 				if (!ChunksForRemote.Contains(newCoord))
-				{	
-					CoordsToGenerate.Add(newCoord);				
+				{
+					CoordsToGenerate.Add(weight,newCoord);				
 					Chunks.Add(newCoord,nullptr);
 				}
 				else
@@ -240,8 +245,6 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 			}
 		}	
 	}
-	double TEnd = FPlatformTime::Seconds();
-//UE_LOG(LogTemp, Warning, TEXT("Building chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
 }
 
 int ACubeGenerator::GetSurfaceHighInPos(FVector vec)
