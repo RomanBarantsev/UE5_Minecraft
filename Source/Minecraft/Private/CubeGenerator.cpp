@@ -215,8 +215,8 @@ void ACubeGenerator::UpdateChunks(FVector coord)
 	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
 	UE_LOG(LogTemp, Warning, TEXT("chunkCoord x %d y %d"),chunkCoord.x,chunkCoord.y);
 	
-	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDeep
-	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDeep
+	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDeep/2
+	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDeep/2
 											|| currentChunkPosition.startPos)
 	{
 		currentChunkPosition.startPos=false;
