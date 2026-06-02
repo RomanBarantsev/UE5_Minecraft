@@ -23,7 +23,7 @@ bool FGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 bool FGreedyMeshing::IsAir(int x, int y, int z)
 {
 	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X || y >= CHUNK_X || z >= CHUNK_Z)
-		return true; // за границей = воздух
+		return true; 
 	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
 
@@ -65,7 +65,6 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 
 	for (int z = 0; z < CHUNK_Z; z++)
 	{
-		//clear mask
 		for (int x = 0; x < CHUNK_X; x++)
 		{
 			for (int y = 0; y < CHUNK_X; y++)
@@ -73,7 +72,6 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 				Mask[x][y].bValid = false;
 			}
 		}
-		// 1. build mask
 		for (int x = 0; x < CHUNK_X; x++)
 			for (int y = 0; y < CHUNK_X; y++)
 			{
@@ -86,8 +84,6 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 					Mask[x][y].Type =  Chunk->GetBlock(x,y,z);
 				}
 			}
-
-		// 2. greedy merge mask
 		for (int x = 0; x < CHUNK_X; x++)
 			for (int y = 0; y < CHUNK_X; y++)
 			{
@@ -119,11 +115,7 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 					}
 					if (!done) height++;
 				}
-
-				// 3. добавить ОДНУ большую грань
 				AddQuadZ(x, y, z, width, height, bPositive, Type);
-
-				// 4. "съесть" mask
 				for (int dx = 0; dx < width; dx++)
 					for (int dy = 0; dy < height; dy++)
 						Mask[x + dx][y + dy].bValid = false;
@@ -171,10 +163,7 @@ void FGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive,
                         FVector::DownVector, FVector::DownVector });
     }
     
-    
-	// ===== UV система для greedy + атлас =====
-
-	const float AtlasSize = 4.0f;
+    const float AtlasSize = 4.0f;
 	const float TileSize = 1.0f / AtlasSize;
 
 	float tileIndex = GetTileIndex(Type);
@@ -183,8 +172,6 @@ void FGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive,
 
 	float baseU = tileX * TileSize;
 	float baseV = tileY * TileSize;
-
-	// ---- UV0 : тайлинг (0..w, 0..h)
 
 	if (bPositive)
 	{
@@ -201,8 +188,6 @@ void FGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive,
 		UVs.Add({(float)w, (float)h});
 	}
 
-	// ---- UV1 : смещение тайла в атласе
-
 	for (int i = 0; i < 4; i++)
 		UV1s.Add({ baseU, baseV });
 }
@@ -211,25 +196,18 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
 {
     int dx = bPositive ? 1 : -1;
 
-    // НУЖНО ИЗМЕНИТЬ РАЗМЕР МАСКИ ДЛЯ ОСИ X!
-    // Для оси X: маска должна быть размером [CHUNK_X][CHUNK_Z]
-    
-    // Создаем маску с правильными размерами
     std::vector<std::vector<FMaskCell>> Mask(CHUNK_X, std::vector<FMaskCell>(CHUNK_Z));
 
     for (int x = 0; x < CHUNK_X; x++)
     {
-        // 1. Очистить маску для текущего слоя X
         for (int y = 0; y < CHUNK_X; y++)
             for (int z = 0; z < CHUNK_Z; z++)
                 Mask[y][z].bValid = false;
 
-        // 2. Построить маску видимых граней
         for (int y = 0; y < CHUNK_X; y++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
             {
-                // Проверяем грани по оси X
                 if (IsFaceVisible(x, y, z, dx, 0, 0))
                 {
                     Mask[y][z].bValid = true;
@@ -238,7 +216,6 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
             }
         }
 
-        // 3. Объединение видимых граней (Greedy алгоритм)
         for (int y = 0; y < CHUNK_X; y++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
@@ -248,7 +225,6 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
 
                 BlockType CurrentType = Mask[y][z].Type;
 
-                // Находим ширину (по оси Y)
                 int width = 1;
                 while (y + width < CHUNK_X &&
                        Mask[y + width][z].bValid &&
@@ -257,7 +233,6 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
                     width++;
                 }
 
-                // Находим высоту (по оси Z)
                 int height = 1;
                 bool done = false;
                 while (z + height < CHUNK_Z && !done)
@@ -274,10 +249,8 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
                     if (!done) height++;
                 }
 
-                // 4. Добавить объединенный квад
                 AddQuadX(x, y, z, width, height, bPositive, CurrentType);
 
-                // 5. Пометить использованные ячейки как обработанные
                 for (int dy = 0; dy < width; dy++)
                 {
                     for (int dz = 0; dz < height; dz++)
@@ -297,54 +270,47 @@ void FGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
     
     if (bPositive)
     {
-        // X+ (правая грань)
         xCoord = (x + 1) * BLOCK_SIZE;
-        Normal = FVector(1, 0, 0); // Нормаль вправо
+        Normal = FVector(1, 0, 0);
     }
     else
     {
-        // X- (левая грань)
         xCoord = x * BLOCK_SIZE;
-        Normal = FVector(-1, 0, 0); // Нормаль влево
+        Normal = FVector(-1, 0, 0); 
     }
     
-    // Базовые координаты
     float baseY = y * BLOCK_SIZE;
     float baseZ = z * BLOCK_SIZE;
     
-    // Размеры квада
-    float quadWidth = w * BLOCK_SIZE;  // по Y
-    float quadHeight = h * BLOCK_SIZE; // по Z
+    float quadWidth = w * BLOCK_SIZE;  
+    float quadHeight = h * BLOCK_SIZE;
     
     int start = Vertices.Num();
 
     if (bPositive)
     {
-        // X+: нормаль вправо (+X)
-        Vertices.Add(FVector(xCoord, baseY, baseZ));                     // 0
-        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        // 1
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); // 2
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         // 3
+        Vertices.Add(FVector(xCoord, baseY, baseZ));                     
+        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); 
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));        
         
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     else
     {
         // X-: нормаль влево (-X)
-        Vertices.Add(FVector(xCoord, baseY, baseZ));                     // 0
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         // 1
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); // 2
-        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        // 3
+        Vertices.Add(FVector(xCoord, baseY, baseZ));                    
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         
+        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); 
+        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));       
         
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     
-    // Добавляем нормали
     for (int i = 0; i < 4; i++)
     {
         Normals.Add(Normal);
     }
-	// ===== UV система для greedy + атлас =====
 
 	const float AtlasSize = 4.0f;
 	const float TileSize = 1.0f / AtlasSize;
@@ -356,7 +322,6 @@ void FGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive,
 	float baseU = tileX * TileSize;
 	float baseV = tileY * TileSize;
 
-	// ---- UV0 : тайлинг (0..w, 0..h)
 	Tailing(baseU,baseV,w,h,bPositive);   
 }
 
@@ -377,7 +342,6 @@ void FGreedyMeshing::Tailing(float baseU, float baseV, int w,int h, bool bPositi
 		UVs.Add({(float)w, (float)h});
 	}
 
-	// ---- UV1 : смещение тайла в атласе
 
 	for (int i = 0; i < 4; i++)
 		UV1s.Add(FVector2D(baseU, baseV ));
@@ -387,17 +351,14 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
 {
     int dy = bPositive ? 1 : -1;
 
-    // Для оси Y: маска должна быть размером [CHUNK_X][CHUNK_Z]
     std::vector<std::vector<FMaskCell>> Mask(CHUNK_X, std::vector<FMaskCell>(CHUNK_Z));
 
     for (int y = 0; y < CHUNK_X; y++)
     {
-        // Очистить маску
         for (int x = 0; x < CHUNK_X; x++)
             for (int z = 0; z < CHUNK_Z; z++)
                 Mask[x][z].bValid = false;
 
-        // Построить маску
         for (int x = 0; x < CHUNK_X; x++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
@@ -410,7 +371,6 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
             }
         }
 
-        // Объединение
         for (int x = 0; x < CHUNK_X; x++)
         {
             for (int z = 0; z < CHUNK_Z; z++)
@@ -458,66 +418,53 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
     }
 }
 void FGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
-{
-    // Для оси Y:
-    // w - размер по X (width)
-    // h - размер по Z (height)
-    
-    // Определяем координату плоскости Y
+{   
     float yCoord;
     FVector Normal;
     
     if (bPositive)
     {
-        // Y+ (грань смотрит в сторону +Y)
         yCoord = (y + 1) * BLOCK_SIZE;
         Normal = FVector(0, 1, 0);
     }
     else
     {
-        // Y- (грань смотрит в сторону -Y)
         yCoord = y * BLOCK_SIZE;
         Normal = FVector(0, -1, 0);
     }
     
-    // Базовые координаты
     float baseX = x * BLOCK_SIZE;
     float baseZ = z * BLOCK_SIZE;
     
-    // Размеры квада
-    float quadWidth = w * BLOCK_SIZE;  // по X
-    float quadHeight = h * BLOCK_SIZE; // по Z
+    float quadWidth = w * BLOCK_SIZE;  
+    float quadHeight = h * BLOCK_SIZE; 
     
     int start = Vertices.Num();
 
     if (bPositive)
     {
-        // Y+ грань
-        Vertices.Add(FVector(baseX, yCoord, baseZ));                     // 0: нижний-левый
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));         // 1: нижний-правый
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); // 2: верхний-правый
-        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        // 3: верхний-левый
-        
+        Vertices.Add(FVector(baseX, yCoord, baseZ));                    
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));       
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); 
+        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     else
     {
         // Y- грань
-        Vertices.Add(FVector(baseX, yCoord, baseZ));                     // 0: нижний-левый
-        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        // 1: верхний-левый
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); // 2: верхний-правый
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));         // 3: нижний-правый
+        Vertices.Add(FVector(baseX, yCoord, baseZ));                     
+        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); 
+        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));        
         
         Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
     }
     
-    // Добавляем нормали
     for (int i = 0; i < 4; i++)
     {
         Normals.Add(Normal);
     }
     
-    // ===== UV система для greedy + атлас =====
     const float AtlasSize = 4.0f;
     const float TileSize = 1.0f / AtlasSize;
 
@@ -528,28 +475,21 @@ void FGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive,
     float baseU = tileX * TileSize;
     float baseV = tileY * TileSize;
 
-    // ---- UV0 : тайлинг (0..w, 0..h)
-    // Для Y+ грани: вершины идут по часовой стрелке снизу-слева
-    // Для Y- грани: вершины идут против часовой стрелки
-
     if (bPositive)
     {
-        // Y+: 0-1-2-3: нижний-левый -> нижний-правый -> верхний-правый -> верхний-левый
-        UVs.Add(FVector2D(0.0f, 0.0f));           // v0: нижний-левый (U=0, V=0)
-        UVs.Add(FVector2D((float)w, 0.0f));       // v1: нижний-правый (U=w, V=0)
-        UVs.Add(FVector2D((float)w, (float)h));   // v2: верхний-правый (U=w, V=h)
-        UVs.Add(FVector2D(0.0f, (float)h));       // v3: верхний-левый (U=0, V=h)
+        UVs.Add(FVector2D(0.0f, 0.0f));          
+        UVs.Add(FVector2D((float)w, 0.0f));      
+        UVs.Add(FVector2D((float)w, (float)h));   
+        UVs.Add(FVector2D(0.0f, (float)h));       
     }
     else
     {
-        // Y-: 0-1-2-3: нижний-левый -> верхний-левый -> верхний-правый -> нижний-правый
-        UVs.Add(FVector2D(0.0f, 0.0f));           // v0: нижний-левый (U=0, V=0)
-        UVs.Add(FVector2D(0.0f, (float)h));       // v1: верхний-левый (U=0, V=h)
-        UVs.Add(FVector2D((float)w, (float)h));   // v2: верхний-правый (U=w, V=h)
-        UVs.Add(FVector2D((float)w, 0.0f));       // v3: нижний-правый (U=w, V=0)
+        UVs.Add(FVector2D(0.0f, 0.0f));          
+        UVs.Add(FVector2D(0.0f, (float)h));      
+        UVs.Add(FVector2D((float)w, (float)h));  
+        UVs.Add(FVector2D((float)w, 0.0f));      
     }
 
-    // ---- UV1 : смещение тайла в атласе
     for (int i = 0; i < 4; i++)
         UV1s.Add(FVector2D(baseU, baseV));   
  
@@ -562,10 +502,10 @@ FVector FGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	Vertices,
 	Triangles,
 	Normals,
-	UVs,     // UV0
-	UV1s,    // UV1
-	TArray<FVector2D>(), // UV2
-	TArray<FVector2D>(), // UV3
+	UVs,     
+	UV1s,    
+	TArray<FVector2D>(), 
+	TArray<FVector2D>(),
 	TArray<FColor>(),
 	TArray<FProcMeshTangent>(),
 	true
@@ -573,13 +513,6 @@ FVector FGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	procMesh.SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	procMesh.SetCollisionObjectType(ECC_WorldDynamic);
 	procMesh.SetCollisionResponseToAllChannels(ECR_Block);
-
-	/*procMesh.SetSimulatePhysics(true);
-	procMesh.SetEnableGravity(true);
-	procMesh.ContainsPhysicsTriMeshData(true);
-	procMesh.RecreatePhysicsState();
-	procMesh.bUseComplexAsSimpleCollision = false;*/
-
 	
 	procMesh.SetIndex(0);
 	procMesh.SetMaterial(0, Mat);

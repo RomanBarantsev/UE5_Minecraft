@@ -3,6 +3,7 @@
 
 #include "CubeGenerator.h"
 
+#include "BreakableCube.h"
 #include "GreedyMeshing.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Minecraft/BiomDataAsset.h"
@@ -36,9 +37,7 @@ void ACubeGenerator::BeginPlay()
 	LoadAllBioms();
 	InitializeBiomeMap();
 	
-	//time start
 	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
-	//time end
 }
 
 void ACubeGenerator::Tick(float DeltaSeconds)
@@ -104,9 +103,7 @@ void ACubeGenerator::InitializeBiomeMap()
 		BiomesLUTArray[i]=CalculateBiomWeights(T,H);
 	});
 	double EndTime = FPlatformTime::Seconds();
-	double TimePassedMs = (EndTime - StartTime) * 1000.0; // Переводим в миллисекунды
-
-	// Выводим результат в Output Log
+	double TimePassedMs = (EndTime - StartTime) * 1000.0; 
 	UE_LOG(LogTemp, Warning, TEXT("InitializeBiomeMap (Parallel) took: %f ms"), TimePassedMs);
 }
 
@@ -192,7 +189,6 @@ int ACubeGenerator::CalculateHeight(FNoises noises)
 	float BaseHeight = ContinentalnessCurve->GetFloatValue(noises.Continentalness);
 	float Erosion = (noises.Erosion + 1.0f) * 0.5; // 0-1
 	float Peaks = PeaksValleysCurve->GetFloatValue(noises.PeaksValleys);
-	//Peaks = FMath::Pow(Peaks, Erosion);
 	float Height = BaseHeight +	Peaks*Erosion;
 	FInterpolatedBiomeData Biome = GetInterpolatedLUTData(noises.Temperature, noises.Humidity);
 	Height =Height * Biome.VerticalScale +Biome.HeightOffset;	
@@ -271,7 +267,7 @@ void ACubeGenerator::RemoveChunk(FChunkCoord coord)
 		MeshesMap.Remove(coord);
 		FreeProcMeshes.Add(Mesh);
 		MeshToChunkMap.Remove(Mesh);
-		//FreeChunkцs.Add(Chunks[coord].Get());	
+		//FreeChunks.Add(Chunks[coord].Get());	
 	}	
 }
 
@@ -327,8 +323,8 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 				float Tunnel  = FastNoises.CavesTunnelNoise.GetNoise(fx, fy, static_cast<float>(z));
 				float Mask = GetHeightMask(z, 1, height - 6);
 				float Density =
-					Tunnel * 1.2f +     // тоннели важнее
-					Room * 0.8f;        // залы реже
+					Tunnel * 1.2f +     // tunnels are more important
+					Room * 0.8f;        // rooms are not so frequently
 				Density *= Mask;
 				if (Density > 0.25f)
 				{
@@ -343,15 +339,21 @@ void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData
 {	
 	auto LUTData = GetLUTData(noises.Temperature,noises.Humidity);
 	auto BiomeLayers = LUTData.Biome->SurfaceLayers;
-	float bedrockNoise = FastNoises.BedrockNoise.GetNoise(static_cast<float>(x),static_cast<float>(y));
-	int bedrockTop = BEDROCK_BASE + static_cast<int>(((bedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
+	float bedrockNoise = FastNoises.BedrockNoise.GetNoise(static_cast<float>(x)* 0.1f,static_cast<float>(y)* 0.1f);
+	int ThicknessOffset = FMath::RoundToInt(bedrockNoise * 2.5f);
 	for (auto Layer : BiomeLayers)
-	{
-		for (int i = z; i > z-Layer.Key+bedrockTop; --i)
+	{		
+		int baseThickness = Layer.Key;	
+		int DynamicThickness = baseThickness + ThicknessOffset;
+		if (DynamicThickness <= 0)
+		{
+			continue; 
+		}
+		for (int i = z; i > z-DynamicThickness; --i)
 		{
 			Data.SetBlock(x,y,i,Layer.Value);
 		}
-		z-=Layer.Key;
+		z-=DynamicThickness;
 	}	
 }
 
@@ -430,19 +432,18 @@ void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshCompone
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
-	mesh->bUseAsyncCooking = true; //????
+	mesh->bUseAsyncCooking = true; 
 	FGreedyMeshing GreedyMeshing;	
 	GreedyMeshing.BuildGreedyMesh(Chunk);
 	GreedyMeshing.CreateMesh(*mesh,Mat);
 	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	FActorSpawnParameters spawnParams;
 	//TODO make a pool
-	/*auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,CubeLocation,FRotator::ZeroRotator,spawnParams);
+	auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,CubeLocation,FRotator::ZeroRotator,spawnParams);
 	ABreakableCube* Cube = Cast<ABreakableCube>(Actor);
 	if (Cube)
 	{
 		Cube->FractureNow(CurrentBlockType,Hit);
-	}*/
+	}
 	double TEnd = FPlatformTime::Seconds();
-	//UE_LOG(LogTemp, Warning, TEXT("ReBuilding chunk took: %.2f ms"), (TEnd - TStart) * 1000.0f);
 }

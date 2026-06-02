@@ -25,9 +25,9 @@ void AMC_Pawn::BeginPlay()
 	Super::BeginPlay();	
 	if (UFloatingPawnMovement* Move = FindComponentByClass<UFloatingPawnMovement>())
 	{
-		Move->MaxSpeed = 600000.f;       
-		Move->Acceleration = 120000.f;   
-		Move->Deceleration = 120000.f;
+		Move->MaxSpeed = 30000.f;       
+		Move->Acceleration = 12000.f;   
+		Move->Deceleration = 12000.f;
 	}
 	TArray<AActor*> OutActors;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(),ACubeGenerator::StaticClass(),OutActors);

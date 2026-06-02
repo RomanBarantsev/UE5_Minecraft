@@ -1,9 +1,7 @@
 ﻿#include "BreakableCube.h"
 #include "Components/PrimitiveComponent.h"
-#include "Field/FieldSystemObjects.h"
 #include "GameFramework/Actor.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
-#include "GeometryCollection/GeometryCollectionSimulationTypes.h"
 
 ABreakableCube::ABreakableCube()
 {
@@ -27,13 +25,11 @@ void ABreakableCube::FractureNow(BlockType type, FHitResult hit)
         {
             if (auto DynamicMaterial = GeometryCollectionComponent->CreateAndSetMaterialInstanceDynamic(0))
             {
-                // Устанавливаем индекс тайла для этого экземпляра
-                DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); // Пример значения
+                DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type);
             } 
             if (auto DynamicMaterial = GeometryCollectionComponent->CreateAndSetMaterialInstanceDynamic(1))
             {
-                // Устанавливаем индекс тайла для этого экземпляра
-                DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); // Пример значения
+                DynamicMaterial->SetScalarParameterValue(FName("TileIndex"), type); 
             }
         }
         
