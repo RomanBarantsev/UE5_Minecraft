@@ -6,7 +6,7 @@
 #include "GameFramework/DefaultPawn.h"
 #include "MC_Pawn.generated.h"
 
-class ACubeGenerator;
+class UChunkWorldSubsystem;
 class FGreedyMeshing;
 
 UCLASS()
@@ -31,7 +31,7 @@ public:
 	void PlaceAboveSurface();
 	void Fire();
 	UPROPERTY()
-	ACubeGenerator* CubeGenerator;
+	UChunkWorldSubsystem* ChunkWorldSubsystem;
 	void Redraw();
 	UFUNCTION()
 	FVector GetPlayerVoxelPos();

@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "CubeGenerator.h"
+#include "ChunkGenerator.h"
 #include "UnrealWidgetFwd.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/HorizontalBox.h"

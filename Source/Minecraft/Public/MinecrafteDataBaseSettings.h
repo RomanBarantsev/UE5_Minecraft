@@ -4,16 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
-#include "NoiseDataBaseSettings.generated.h"
+#include "MinecrafteDataBaseSettings.generated.h"
 
 /**
  * 
  */
 UCLASS(Config=Game, defaultconfig, meta=(DisplayName="Voxel World Generation"))
-class MINECRAFT_API UNoiseDataBaseSettings : public UDeveloperSettings
+class MINECRAFT_API UMinecraftDataBaseSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "Noise")
 	FSoftObjectPath PerlinNoiseTablePath;
+	UPROPERTY(Config, EditAnywhere, Category = "Material")
+	FSoftObjectPath BlocksMaterial;
 };

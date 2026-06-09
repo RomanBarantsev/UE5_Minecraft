@@ -3,11 +3,10 @@
 
 #include "MC_Pawn.h"
 
-#include "CubeGenerator.h"
+#include "ChunkWorldSubsystem.h"
 #include "FChunkBuildData.h"
 #include "MinecraftProceduralMeshComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
-#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 
@@ -29,12 +28,10 @@ void AMC_Pawn::BeginPlay()
 		Move->Acceleration = 12000.f;   
 		Move->Deceleration = 12000.f;
 	}
-	TArray<AActor*> OutActors;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(),ACubeGenerator::StaticClass(),OutActors);
-	CubeGenerator = Cast<ACubeGenerator>(OutActors[0]);
-	if (!CubeGenerator)
+	ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkWorldSubsystem>();
+	if (!ChunkWorldSubsystem)
 	{
-		UE_LOG(LogTemp,Error,TEXT("CubeGenerator is nullptr"));
+		UE_LOG(LogTemp,Error,TEXT("ChunkWorldSubsystem is nullptr"));
 	}
 	//PlaceAboveSurface();
 	GetWorld()->GetTimerManager().SetTimer(WorldUpdateTimerHandle,this,&AMC_Pawn::WorldUpdate,1.0f,true,0);
@@ -42,9 +39,9 @@ void AMC_Pawn::BeginPlay()
 
 void AMC_Pawn::WorldUpdate()
 {
-	if (CubeGenerator)
+	if (ChunkWorldSubsystem)
 	{
-	CubeGenerator->UpdateChunks(GetActorLocation());		
+		ChunkWorldSubsystem->UpdateChunks(GetActorLocation());		
 	}
 }
 
@@ -56,7 +53,9 @@ void AMC_Pawn::Tick(float DeltaTime)
 
 void AMC_Pawn::PlaceAboveSurface()
 {
-	auto height = CubeGenerator->GetSurfaceHighInPos(GetActorLocation());
+	if (!ChunkWorldSubsystem)
+		return;
+	auto height = ChunkWorldSubsystem->GetSurfaceHighInPos(GetActorLocation());
 	SetActorLocation(GetActorLocation() + FVector(0,0,height*BLOCK_SIZE+PawnSize));
 	UE_LOG(LogTemp,Warning,TEXT("height %d"),height);
 }
@@ -71,7 +70,10 @@ void AMC_Pawn::Fire()
 	{
 		auto Mesh = Cast<UMinecraftProceduralMeshComponent>(Hit.GetComponent());
 		if (!Mesh) return;
-		CubeGenerator->RemoveBlock(Hit, Mesh);
+		if (ChunkWorldSubsystem)
+		{
+			ChunkWorldSubsystem->RemoveBlock(Hit, Mesh);
+		}
 	}		
 }
 

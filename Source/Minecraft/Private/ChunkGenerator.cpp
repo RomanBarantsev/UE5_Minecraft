@@ -1,9 +1,10 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "CubeGenerator.h"
+#include "ChunkGenerator.h"
 
 #include "BreakableCube.h"
+#include "Minecraft/ChunkWorldSubsystem.h"
 #include "GreedyMeshing.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Minecraft/BiomDataAsset.h"
@@ -17,7 +18,7 @@
 class UProceduralMeshComponent;
 // Sets default values
 
-ACubeGenerator::ACubeGenerator()
+AChunkGenerator::AChunkGenerator()
 {
 	PrimaryActorTick.bCanEverTick = true;	
 	// Создаём корневой компонент
@@ -27,7 +28,7 @@ ACubeGenerator::ACubeGenerator()
 
 
 // Called when the game starts or when spawned
-void ACubeGenerator::BeginPlay()
+void AChunkGenerator::BeginPlay()
 {
 	Super::BeginPlay();
 	NoiseManager = GetGameInstance()->GetSubsystem<UNoiseManagerSubSystem>();
@@ -36,37 +37,21 @@ void ACubeGenerator::BeginPlay()
 	FastNoises = NoiseManager->GetNoises();
 	LoadAllBioms();
 	InitializeBiomeMap();
-	
-	UpdateChunks(FVector(0.0f,0.0f,0.0f));//start pos
+
+	if (UChunkWorldSubsystem* ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkWorldSubsystem>())
+	{
+		ChunkWorldSubsystem->SetChunkGenerator(this);
+		ChunkWorldSubsystem->UpdateChunks(FVector::ZeroVector);
+	}
 }
 
-void ACubeGenerator::Tick(float DeltaSeconds)
+void AChunkGenerator::Tick(float DeltaSeconds)
 {	
 	Super::Tick(DeltaSeconds);	
-	if (CoordsToGenerate.IsEmpty())
-		return;	
-	TArray<FAsyncGenerationResult> Results;
-	Results.SetNum(CoordsToGenerate.Num());
-	TArray<FChunkCoord> GenerateArray;
-	for (int i = 0; i < OperationPerTick; i++)
-	{
-		for (int j = 0; j < chunkDeep*2; ++j)
-		{
-			auto It = CoordsToGenerate.CreateKeyIterator(j);
-			if(It)
-			{
-				FChunkCoord OutCoord = It.Value();
-				It.RemoveCurrent();
-				GenerateArray.Push(OutCoord);
-				break;
-			}		
-			
-		}	
-	}
-	AsyncChunkCreate(GenerateArray,Results);	
+	
 }
 
-void ACubeGenerator::LoadAllBioms()
+void AChunkGenerator::LoadAllBioms()
 {
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
@@ -90,7 +75,7 @@ void ACubeGenerator::LoadAllBioms()
 	}
 }
 
-void ACubeGenerator::InitializeBiomeMap()
+void AChunkGenerator::InitializeBiomeMap()
 {		
 	BiomesLUTArray.SetNumUninitialized(BiomesArraySize);
 	double StartTime = FPlatformTime::Seconds();
@@ -107,7 +92,7 @@ void ACubeGenerator::InitializeBiomeMap()
 	UE_LOG(LogTemp, Warning, TEXT("InitializeBiomeMap (Parallel) took: %f ms"), TimePassedMs);
 }
 
-FBiomLUTMap ACubeGenerator::CalculateBiomWeights(int T, int H)
+FBiomLUTMap AChunkGenerator::CalculateBiomWeights(int T, int H)
 {	
 	float fTemp=T/100.0f;
 	float fHum=H/100.0f;
@@ -140,7 +125,7 @@ FBiomLUTMap ACubeGenerator::CalculateBiomWeights(int T, int H)
 	return BlendedBiomeData; 
 }
 
-float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
+float AChunkGenerator::GetHeightMask(int z, int minZ, int maxZ)
 {
 	if (z <= minZ || z >= maxZ) return 0.0f;
 
@@ -148,7 +133,7 @@ float ACubeGenerator::GetHeightMask(int z, int minZ, int maxZ)
 	return 1.0f - t * t; // плавно затухает к поверхности
 }
 
-FInterpolatedBiomeData ACubeGenerator::GetInterpolatedLUTData(float T, float H) 
+FInterpolatedBiomeData AChunkGenerator::GetInterpolatedLUTData(float T, float H) 
 {
 	// 1. Переводим [-1, 1] в координаты сетки [0, 199]
 	float GridT = (T + 1.0f) * 0.5f * 199.0f;
@@ -183,7 +168,7 @@ FInterpolatedBiomeData ACubeGenerator::GetInterpolatedLUTData(float T, float H)
 	return { FinalScale, FinalOffset };
 }
 
-int ACubeGenerator::CalculateHeight(FNoises noises)
+int AChunkGenerator::CalculateHeight(FNoises noises)
 {
 	
 	float BaseHeight = ContinentalnessCurve->GetFloatValue(noises.Continentalness);
@@ -196,82 +181,15 @@ int ACubeGenerator::CalculateHeight(FNoises noises)
 	return FMath::Clamp(FMath::FloorToInt(Height), 1, CHUNK_Z - 2);
 }
 
-void ACubeGenerator::UpdateChunks(FVector coord)
+void AChunkGenerator::UpdateChunks(FVector coord)
 {
-	if (!ChunksForRemote.IsEmpty())
+	if (UChunkWorldSubsystem* ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkWorldSubsystem>())
 	{
-		for (auto Chunk : ChunksForRemote)
-		{
-			RemoveChunk(Chunk.Key); //TODO per tick
-		}
-	}
-	coord/=BLOCK_SIZE;
-	FChunkCoord chunkCoord;
-	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X);
-	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
-	UE_LOG(LogTemp, Warning, TEXT("chunkCoord x %d y %d"),chunkCoord.x,chunkCoord.y);
-	
-	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDeep/2
-	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDeep/2
-											|| currentChunkPosition.startPos)
-	{
-		currentChunkPosition.startPos=false;
-		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDeep) * chunkDeep;
-		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDeep) * chunkDeep;
-		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);
-		ChunksForRemote = Chunks; //TODO shouldn't replace, there can be some chunks to remote.
-		Chunks.Empty();				
-		
-		for (int x  = chunkCoord.x-chunkDeep; x < chunkCoord.x+chunkDeep; ++x)
-		{
-			for (int y = chunkCoord.y-chunkDeep; y < chunkCoord.y+chunkDeep; ++y)
-			{
-				FChunkCoord newCoord{x,y};
-				int weight = FMath::Max(FMath::Abs(chunkCoord.x-x),FMath::Abs(chunkCoord.y-y));
-				if (!ChunksForRemote.Contains(newCoord))
-				{
-					CoordsToGenerate.Add(weight,newCoord);				
-					Chunks.Add(newCoord,nullptr);
-				}
-				else
-				{
-					Chunks.Add(newCoord,ChunksForRemote[newCoord]);
-					ChunksForRemote.Remove(newCoord);
-				}				
-			}
-		}	
+		ChunkWorldSubsystem->UpdateChunks(coord);
 	}
 }
 
-int ACubeGenerator::GetSurfaceHighInPos(FVector vec)
-{
-	int XChunkCoord = FMath::FloorToInt(vec.X / BLOCK_SIZE);
-	int YChunkCoord = FMath::FloorToInt(vec.Y / BLOCK_SIZE);
-	int XChunk = XChunkCoord/CHUNKSIZE_WIDE;
-	int YChunk = YChunkCoord/CHUNKSIZE_WIDE;
-	FChunkCoord Coord{XChunk,YChunk};
-	if (!Chunks.Contains(Coord))
-		return 0;
-	auto chunk = Chunks[Coord];
-	if (chunk==nullptr)
-		return 0;
-	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
-}
-
-void ACubeGenerator::RemoveChunk(FChunkCoord coord)
-{
-	if (MeshesMap.Contains(coord))
-	{
-		UMinecraftProceduralMeshComponent* Mesh = MeshesMap[coord];
-		Mesh->ClearAllMeshSections();
-		MeshesMap.Remove(coord);
-		FreeProcMeshes.Add(Mesh);
-		MeshToChunkMap.Remove(Mesh);
-		//FreeChunks.Add(Chunks[coord].Get());	
-	}	
-}
-
-void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
+void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 {
 	for (int x = 0; x < CHUNK_X; x++)
 	{
@@ -301,7 +219,7 @@ void ACubeGenerator::GenerateChunkData(FChunkBuildData& Data)
 	Data.Fill();
 }
 
-void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
+void AChunkGenerator::GenerateCaves(FChunkBuildData& Data)
 {
 	for (int xPerlin = Data.Coord.x*CHUNK_X, x =0; xPerlin <Data.Coord.x*CHUNK_X+CHUNK_X; xPerlin++,x++)
 	{
@@ -335,7 +253,7 @@ void ACubeGenerator::GenerateCaves(FChunkBuildData& Data)
 	}
 }
 
-void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)
+void AChunkGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)
 {	
 	auto LUTData = GetLUTData(noises.Temperature,noises.Humidity);
 	auto BiomeLayers = LUTData.Biome->SurfaceLayers;
@@ -357,93 +275,3 @@ void ACubeGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData
 	}	
 }
 
-void ACubeGenerator::FinalizeChunk(FChunkBuildData& Data,FGreedyMeshing& GreedyMeshing)
-{
-	UMinecraftProceduralMeshComponent* ProcMesh;
-	if (FreeProcMeshes.IsEmpty())
-	{
-		ProcMesh = NewObject<UMinecraftProceduralMeshComponent>(this);
-		ProcMesh->RegisterComponent();
-		ProcMesh->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
-		ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		ProcMesh->bUseAsyncCooking = true;
-	}
-	else
-	{
-		ProcMesh = FreeProcMeshes.Pop();		
-	}
-	ProcMesh->SetRelativeLocation(FVector(Data.Coord.x*CHUNK_X*BLOCK_SIZE, Data.Coord.y*CHUNK_X*BLOCK_SIZE, 0));
-	GreedyMeshing.CreateMesh(*ProcMesh,Mat);
-	MeshesMap.Add(Data.Coord,ProcMesh);
-	MeshToChunkMap.Add(ProcMesh,&Data);
-}
-
-void ACubeGenerator::AsyncChunkCreate(TArray<FChunkCoord>& GenerateArray,TArray<FAsyncGenerationResult>& Results)
-{	
-	TWeakObjectPtr<ACubeGenerator> WeakThis = this;
-	Async(EAsyncExecution::ThreadPool,[WeakThis,GenerateArray,Results]() mutable
-	{
-		ParallelFor(GenerateArray.Num(),[&](int32 i)
-		{
-			if (!WeakThis.IsValid())
-				return;
-			FChunkCoord CurrentCoord = GenerateArray[i];
-			
-			auto Data = MakeShared<FChunkBuildData>();
-			Data->Coord = CurrentCoord;
-			
-			WeakThis->GenerateChunkData(*Data);
-			
-			auto Mesher = MakeShared<FGreedyMeshing>();
-			Mesher->BuildGreedyMesh(&Data.Get());
-			Results[i] = {CurrentCoord,Data,Mesher};
-		});
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, Results]() {
-		if (WeakThis.IsValid()) {
-			for (const auto& Res : Results) {
-				if (Res.BuildData.IsValid()) {
-					if (WeakThis->Chunks.Contains(Res.Coord))
-					{
-						WeakThis->Chunks[Res.Coord] = Res.BuildData;
-						WeakThis->FinalizeChunk(*Res.BuildData, *Res.GreedyMeshing);
-					}					
-				}
-			}
-		}
-		});
-	});
-}
-
-void ACubeGenerator::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
-{
-	double TStart = FPlatformTime::Seconds();
-	FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
-	FVector LocalPos =mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);
-	int X = FMath::FloorToInt(LocalPos.X / BLOCK_SIZE);
-	int Y = FMath::FloorToInt(LocalPos.Y / BLOCK_SIZE);
-	int Z = FMath::FloorToInt(LocalPos.Z / BLOCK_SIZE);
-	LocalPos/=BLOCK_SIZE;
-	
-	FChunkCoord chunkCoord;
-	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X);
-	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y);
-	auto Chunk = MeshToChunkMap[mesh];
-	
-	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
-	Chunk->SetBlock(X,Y,Z,BlockType::Air);
-	mesh->ClearAllMeshSections();
-	mesh->bUseAsyncCooking = true; 
-	FGreedyMeshing GreedyMeshing;	
-	GreedyMeshing.BuildGreedyMesh(Chunk);
-	GreedyMeshing.CreateMesh(*mesh,Mat);
-	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
-	FActorSpawnParameters spawnParams;
-	//TODO make a pool
-	auto Actor = GetWorld()->SpawnActor<AActor>(DestroyedBlockClass,CubeLocation,FRotator::ZeroRotator,spawnParams);
-	ABreakableCube* Cube = Cast<ABreakableCube>(Actor);
-	if (Cube)
-	{
-		Cube->FractureNow(CurrentBlockType,Hit);
-	}
-	double TEnd = FPlatformTime::Seconds();
-}

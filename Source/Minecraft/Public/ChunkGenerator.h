@@ -7,7 +7,7 @@
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/FChunkBuildData.h"
-#include "CubeGenerator.generated.h"
+#include "ChunkGenerator.generated.h"
 
 class UBiomDataAsset;
 class FGreedyMeshing;
@@ -36,18 +36,17 @@ struct FBiomLUTMap
 };
 
 UCLASS()
-class MINECRAFT_API ACubeGenerator : public AActor
+class MINECRAFT_API AChunkGenerator : public AActor
 {
 	GENERATED_BODY()
 private:
-	const int chunkDeep=8;
 	const float delimiterChunkHeight=0.05;
 	UPROPERTY()
 	UNoiseManagerSubSystem* NoiseManager;
 	
 public:
 	// Sets default values for this actor's properties
-	ACubeGenerator();
+	AChunkGenerator();
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -88,47 +87,18 @@ FBiomLUTMap& GetLUTData(float T, float H)
 	void InitializeBiomeMap();
 	FBiomLUTMap CalculateBiomWeights(int T, int H);
 	
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category="Material")
-	UMaterialInterface* Mat;
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<AActor> DestroyedBlockClass;
+	
 private:
 	
 	float GetHeightMask(int z, int minZ, int maxZ);
 	FInterpolatedBiomeData GetInterpolatedLUTData(float T, float H);
 	int CalculateHeight(FNoises noises);
-	void RemoveChunk(FChunkCoord coord);
-	void GenerateChunkData(FChunkBuildData& Data);
 	void GenerateCaves(FChunkBuildData& Data);
 	void GenerateSurfaceLayer(int z, FNoises& noises, FChunkBuildData& Data, int x, int y);
-	void FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing);
 	
-	struct FAsyncGenerationResult {
-		FChunkCoord Coord;
-		TSharedPtr<FChunkBuildData> BuildData;
-		TSharedPtr<FGreedyMeshing> GreedyMeshing;
-	};
-	void AsyncChunkCreate(TArray<FChunkCoord>& GenerateArray,TArray<FAsyncGenerationResult>& Results);	
-	TMultiMap<int32,FChunkCoord> CoordsToGenerate;
-	size_t OperationPerTick=1;
-	
-	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> Chunks;
-	TMap<FChunkCoord,TSharedPtr<FChunkBuildData>> ChunksForRemote;
-	
-	TArray<FChunkBuildData*> FreeChunks;
-	TArray<FGreedyMeshing*> FreeGreedyMeshings;	
-	UPROPERTY()
-	TArray<UMinecraftProceduralMeshComponent*> FreeProcMeshes;
-	
-	TMap<FChunkCoord,UMinecraftProceduralMeshComponent*>MeshesMap;
-	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
-	FChunkCoord currentChunkPosition;
 	bool bIsGeneratingChunk = false;
 public:
+	void GenerateChunkData(FChunkBuildData& Data);
 	UFUNCTION()
 	void UpdateChunks(FVector coord);
-public:
-	int GetSurfaceHighInPos(FVector vec);
-	void RemoveBlock(FHitResult hit,UMinecraftProceduralMeshComponent* mesh);
-	float EPS = 0.1f;	
 };

@@ -3,12 +3,12 @@
 
 #include "NoiseManagerSubSystem.h"
 
-#include "NoiseDataBaseSettings.h"
+#include "MinecrafteDataBaseSettings.h"
 
 
 void UNoiseManagerSubSystem::Initialize(FSubsystemCollectionBase& Collection)
 {
-	const UNoiseDataBaseSettings* Settings = GetDefault<UNoiseDataBaseSettings>();
+	const UMinecraftDataBaseSettings* Settings = GetDefault<UMinecraftDataBaseSettings>();
 	if (Settings)
 	{
 		PerlinNoiseTable = Cast<UDataTable>(Settings->PerlinNoiseTablePath.TryLoad());;
