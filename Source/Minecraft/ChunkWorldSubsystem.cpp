@@ -15,7 +15,7 @@ void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	const UMinecraftDataBaseSettings* Settings = GetDefault<UMinecraftDataBaseSettings>();
 	if (Settings)
 	{
-		BlocksMatertial = Cast<UMaterialInterface>(Settings->BlocksMaterial.TryLoad());;
+		BlocksMatertial = Cast<UMaterialInterface>(Settings->BlocksMaterial.TryLoad());
 		if (!BlocksMatertial)
 			UE_LOG(LogTemp, Warning, TEXT("BlocksMatertial not found, set it in the Project Settings"));
 	}
@@ -23,6 +23,11 @@ void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	FVector SpawnLocation = FVector::ZeroVector;
 	FRotator SpawnRotation = FRotator::ZeroRotator;
 	ChunksContainer = GetWorld()->SpawnActor(AActor::StaticClass(), &SpawnLocation, &SpawnRotation, params);
+	if (!ChunksContainer)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to spawn ChunksContainer"));
+		return;
+	}
 	USceneComponent* RootComponent = NewObject<USceneComponent>(ChunksContainer, TEXT("Root"));
 	RootComponent->RegisterComponent();
 	ChunksContainer->SetRootComponent(RootComponent);
@@ -31,7 +36,10 @@ void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UChunkWorldSubsystem::Deinitialize()
 {
-	GetWorld()->GetTimerManager().ClearTimer(ChunkUpdateTimer);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ChunkUpdateTimer);
+	}
 	ChunkGenerator = nullptr;
 	Super::Deinitialize();
 }
@@ -45,10 +53,13 @@ void UChunkWorldSubsystem::UpdateChunks(FVector coord)
 {
 	if (!ChunksForRemote.IsEmpty())
 	{
-		for (auto Chunk : ChunksForRemote)
+		int RemovedCount = 0;
+		for (auto It = ChunksForRemote.CreateIterator(); It && RemovedCount < OperationPerTick; ++It, ++RemovedCount)
 		{
-			RemoveChunk(Chunk.Key); //TODO per tick
+			RemoveChunk(It.Key());
+			It.RemoveCurrent();
 		}
+		return;
 	}
 	coord/=BLOCK_SIZE;
 	FChunkCoord chunkCoord;
@@ -64,7 +75,13 @@ void UChunkWorldSubsystem::UpdateChunks(FVector coord)
 		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDeep) * chunkDeep;
 		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDeep) * chunkDeep;
 		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);
-		ChunksForRemote = Chunks; //TODO shouldn't replace, there can be some chunks to remote.
+		for (auto& ChunkPair : Chunks)
+		{
+			if (!ChunksForRemote.Contains(ChunkPair.Key))
+			{
+				ChunksForRemote.Add(ChunkPair.Key, ChunkPair.Value);
+			}
+		}
 		Chunks.Empty();				
 		
 		for (int x  = chunkCoord.x-chunkDeep; x < chunkCoord.x+chunkDeep; ++x)
@@ -115,10 +132,13 @@ void UChunkWorldSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& 
 	{
 		ProcMesh = FreeProcMeshes.Pop();		
 	}
-	ProcMesh->SetRelativeLocation(FVector(Data.Coord.x*CHUNK_X*BLOCK_SIZE, Data.Coord.y*CHUNK_X*BLOCK_SIZE, 0));
+	ProcMesh->SetRelativeLocation(FVector(Data.Coord.x*CHUNK_X*BLOCK_SIZE, Data.Coord.y*CHUNK_Y*BLOCK_SIZE, 0));
 	GreedyMeshing.CreateMesh(*ProcMesh,BlocksMatertial);
 	MeshesMap.Add(Data.Coord,ProcMesh);
-	MeshToChunkMap.Add(ProcMesh,&Data);
+	if (Chunks.Contains(Data.Coord))
+	{
+		MeshToChunkMap.Add(ProcMesh, Chunks[Data.Coord].Get());
+	}
 }
 
 void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateArray)
@@ -133,7 +153,8 @@ void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateA
 	
 	TWeakObjectPtr<UChunkWorldSubsystem> WeakSubsystem = this;
 	TWeakObjectPtr<AChunkGenerator> WeakGenerator = ChunkGenerator;
-	Async(EAsyncExecution::ThreadPool,[WeakSubsystem,WeakGenerator,GenerateArray,Results]() mutable
+	TArray<FAsyncGenerationResult>* ResultsPtr = new TArray<FAsyncGenerationResult>(Results);
+	Async(EAsyncExecution::ThreadPool,[WeakSubsystem,WeakGenerator,GenerateArray,ResultsPtr]()
 	{
 		ParallelFor(GenerateArray.Num(),[&](int32 i)
 		{
@@ -148,11 +169,11 @@ void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateA
 			
 			auto Mesher = MakeShared<FGreedyMeshing>();
 			Mesher->BuildGreedyMesh(Data.Get());
-			Results[i] = {CurrentCoord,Data,Mesher};
+			(*ResultsPtr)[i] = {CurrentCoord,Data,Mesher};
 		});
-		AsyncTask(ENamedThreads::GameThread, [WeakSubsystem, Results]() {
+		AsyncTask(ENamedThreads::GameThread, [WeakSubsystem, ResultsPtr]() {
 		if (WeakSubsystem.IsValid()) {
-			for (const auto& Res : Results) {
+			for (const auto& Res : *ResultsPtr) {
 				if (Res.BuildData.IsValid()) {
 					if (WeakSubsystem->Chunks.Contains(Res.Coord))
 					{
@@ -162,6 +183,7 @@ void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateA
 				}
 			}
 		}
+		delete ResultsPtr;
 		});
 	});
 }
@@ -199,14 +221,13 @@ int UChunkWorldSubsystem::GetSurfaceHighInPos(FVector vec)
 	if (!Chunks.Contains(Coord))
 		return 0;
 	auto chunk = Chunks[Coord];
-	if (chunk==nullptr)
+	if (!chunk.IsValid())
 		return 0;
 	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
 }
 
 void UChunkWorldSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
 {
-	double TStart = FPlatformTime::Seconds();
 	FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
 	FVector LocalPos =mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);
 	int X = FMath::FloorToInt(LocalPos.X / BLOCK_SIZE);
@@ -217,8 +238,13 @@ void UChunkWorldSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshC
 	FChunkCoord chunkCoord;
 	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X);
 	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y);
+	if (!MeshToChunkMap.Contains(mesh))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Mesh not found in MeshToChunkMap"));
+		return;
+	}
 	auto Chunk = MeshToChunkMap[mesh];
-	
+
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
@@ -235,5 +261,4 @@ void UChunkWorldSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshC
 	{
 		Cube->FractureNow(CurrentBlockType,Hit);
 	}
-	double TEnd = FPlatformTime::Seconds();
 }
