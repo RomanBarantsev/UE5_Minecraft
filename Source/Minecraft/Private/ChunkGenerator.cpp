@@ -181,42 +181,87 @@ int AChunkGenerator::CalculateHeight(FNoises noises)
 	return FMath::Clamp(FMath::FloorToInt(Height), 1, CHUNK_Z - 2);
 }
 
-void AChunkGenerator::UpdateChunks(FVector coord)
-{
-	if (UChunkWorldSubsystem* ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkWorldSubsystem>())
-	{
-		ChunkWorldSubsystem->UpdateChunks(coord);
-	}
-}
-
 void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 {
-	for (int x = 0; x < CHUNK_X; x++)
-	{
-		for (int y = 0; y < CHUNK_Y; y++)
-		{			
-			int worldX = Data.Coord.x*CHUNK_X+x;
-			int worldY = Data.Coord.y*CHUNK_Y+y;
-			FNoises noises;
-			
-			noises.PeaksValleys = FastNoises.PeaksValleysNoise.GetNoise((float)worldX,(float)worldY);
-			noises.Continentalness = FastNoises.ContinentalnessNoise.GetNoise((float)worldX,(float)worldY);			
-			noises.Bedrock = FastNoises.BedrockNoise.GetNoise((float)worldX,(float)worldY);
-			noises.CavesRoom = FastNoises.CavesRoomNoise.GetNoise((float)worldX,(float)worldY);
-			noises.CavesTunnel = FastNoises.CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
-			noises.Erosion = FastNoises.ErosionNoise.GetNoise((float)worldX,(float)worldY);
-			noises.Humidity = FastNoises.HumidityNoise.GetNoise((float)worldX,(float)worldY);
-			noises.Temperature = FastNoises.TemperatureNoise.GetNoise((float)worldX,(float)worldY);
-			int height = CalculateHeight(noises);
-			if (!BiomesArray.IsEmpty()) 
-				{
-					GenerateSurfaceLayer(height,noises,Data, x, y);
-				}
-			Data.SetSurfaceHeight(x,y,height);
-		}
-	}
-	GenerateCaves(Data);
-	Data.Fill();
+ // Measure total generation time and time for each stage
+ double TotalStart = FPlatformTime::Seconds();
+
+ const int TotalCells = CHUNK_X * CHUNK_Y;
+ TArray<float> Temps; Temps.SetNumUninitialized(TotalCells);
+ TArray<float> Humids; Humids.SetNumUninitialized(TotalCells);
+
+ // 1) Height calculation (also sample and store temperature/humidity for later)
+ double HeightStart = FPlatformTime::Seconds();
+ for (int x = 0; x < CHUNK_X; x++)
+ {
+  for (int y = 0; y < CHUNK_Y; y++)
+  {
+   int worldX = Data.Coord.x*CHUNK_X+x;
+   int worldY = Data.Coord.y*CHUNK_Y+y;
+   FNoises noises;
+
+   noises.PeaksValleys = FastNoises.PeaksValleysNoise.GetNoise((float)worldX,(float)worldY);
+   noises.Continentalness = FastNoises.ContinentalnessNoise.GetNoise((float)worldX,(float)worldY);
+   noises.Bedrock = FastNoises.BedrockNoise.GetNoise((float)worldX,(float)worldY);
+   noises.CavesRoom = FastNoises.CavesRoomNoise.GetNoise((float)worldX,(float)worldY);
+   noises.CavesTunnel = FastNoises.CavesTunnelNoise.GetNoise((float)worldX,(float)worldY);
+   noises.Erosion = FastNoises.ErosionNoise.GetNoise((float)worldX,(float)worldY);
+   noises.Humidity = FastNoises.HumidityNoise.GetNoise((float)worldX,(float)worldY);
+   noises.Temperature = FastNoises.TemperatureNoise.GetNoise((float)worldX,(float)worldY);
+
+   // store temp/humidity for surface generation stage
+   int idx = x * CHUNK_Y + y;
+   Temps[idx] = noises.Temperature;
+   Humids[idx] = noises.Humidity;
+
+   int height = CalculateHeight(noises);
+   Data.SetSurfaceHeight(x,y,height);
+  }
+ }
+ double HeightEnd = FPlatformTime::Seconds();
+
+ // 2) Surface generation (use stored temperature/humidity)
+ double SurfaceStart = FPlatformTime::Seconds();
+ if (!BiomesArray.IsEmpty())
+ {
+  for (int x = 0; x < CHUNK_X; x++)
+  {
+   for (int y = 0; y < CHUNK_Y; y++)
+   {
+	int idx = x * CHUNK_Y + y;
+	FNoises noises;
+	noises.Temperature = Temps[idx];
+	noises.Humidity = Humids[idx];
+	int height = Data.GetSurfaceHeight(x,y);
+	GenerateSurfaceLayer(height, noises, Data, x, y);
+   }
+  }
+ }
+ double SurfaceEnd = FPlatformTime::Seconds();
+
+ // 3) Cave generation
+ double CavesStart = FPlatformTime::Seconds();
+ GenerateCaves(Data);
+ double CavesEnd = FPlatformTime::Seconds();
+
+ // 4) Finalize / Fill
+ double FillStart = FPlatformTime::Seconds();
+ Data.Fill();
+ double FillEnd = FPlatformTime::Seconds();
+
+ double TotalEnd = FPlatformTime::Seconds();
+
+ // Logging timings (milliseconds)
+ double HeightMs = (HeightEnd - HeightStart) * 1000.0;
+ double SurfaceMs = (SurfaceEnd - SurfaceStart) * 1000.0;
+ double CavesMs = (CavesEnd - CavesStart) * 1000.0;
+ double FillMs = (FillEnd - FillStart) * 1000.0;
+ double TotalMs = (TotalEnd - TotalStart) * 1000.0;
+
+ UE_LOG(LogTemp, Warning, TEXT("GenerateChunkData timings for chunk (%d,%d): Height=%.3fms (avg %.6fms/cell), Surface=%.3fms, Caves=%.3fms, Fill=%.3fms, Total=%.3fms"),
+  Data.Coord.x, Data.Coord.y,
+  HeightMs, (HeightMs / (double)TotalCells),
+  SurfaceMs, CavesMs, FillMs, TotalMs);
 }
 
 void AChunkGenerator::GenerateCaves(FChunkBuildData& Data)
