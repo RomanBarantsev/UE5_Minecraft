@@ -6,6 +6,7 @@
 #include "NoiseManagerSubSystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
+#include "Minecraft/FChunkBuildData.h"
 #include "MC_Overlay.generated.h"
 
 class AMC_Pawn;
@@ -33,5 +34,10 @@ class MINECRAFT_API UMC_Overlay : public UUserWidget
 	UPROPERTY()
 	AMC_Pawn* MC_Pawn;
 	UTextBlock* PlayerPos;
+	UTextBlock* ChunkPos;
 	FVector CurrentCoord;
+	FChunkCoord chunkCoord;
+	
+	// Helper method to add a labeled text row to the VerticalBox
+	void AddTextRow(const FText& Label, UTextBlock*& OutTextBlock);
 };

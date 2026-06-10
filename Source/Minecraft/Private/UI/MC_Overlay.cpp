@@ -2,15 +2,10 @@
 
 
 #include "UI/MC_Overlay.h"
-
-#include <string>
-
 #include "ChunkGenerator.h"
-#include "UnrealWidgetFwd.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/HorizontalBox.h"
 #include "Components/VerticalBox.h"
-#include "Kismet/GameplayStatics.h"
 #include "Minecraft/MC_Pawn.h"
 
 void UMC_Overlay::UpdateUI()
@@ -33,7 +28,15 @@ void UMC_Overlay::UpdateUI()
 	FText::AsNumber(CurrentCoord.Y),
 	FText::AsNumber(CurrentCoord.Z));
 	PlayerPos->SetText(PosText);
-	CurrentCoord=coord;
+	CurrentCoord=coord;	
+	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X);
+	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
+	
+	FText ChunkText = FText::Format(
+	NSLOCTEXT("MyNamespace", "ChunkPosKey", "Chunk X: {0} Y: {1}"), 
+	FText::AsNumber(chunkCoord.x), 
+	FText::AsNumber(chunkCoord.y));
+	ChunkPos->SetText(ChunkText);
 }
 
 void UMC_Overlay::NativeConstruct()
@@ -51,24 +54,16 @@ void UMC_Overlay::NativeConstruct()
 		WidgetTree->RootWidget = VerticalBox;
 	}	
 	NoiseManager = GetGameInstance()->GetSubsystem<UNoiseManagerSubSystem>();
-	FSlateColor Color(FLinearColor::Black);
 	if (NoiseManager)
 	{
 		NoisesMap = NoiseManager->GetNoisesMap();
 		if (!NoisesMap.IsEmpty())
 		{
 			for (auto Noise : NoisesMap)
-			{				
-				UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();	
-				Text->SetColorAndOpacity(Color);
-				UTextBlock* NoiseName = WidgetTree->ConstructWidget<UTextBlock>();
-				NoiseName->SetText(Noise.Value);
-				NoiseName->SetColorAndOpacity(Color);
-				TextBlocks.FindOrAdd(Noise.Value.ToString(),Text);
-				auto HorizBox = WidgetTree->ConstructWidget<UHorizontalBox>();
-				HorizBox->AddChild(NoiseName);
-				HorizBox->AddChild(Text);
-				VerticalBox->AddChild(HorizBox);				
+			{
+				UTextBlock* NoiseValueText = nullptr;
+				AddTextRow(Noise.Value, NoiseValueText);
+				TextBlocks.FindOrAdd(Noise.Value.ToString(), NoiseValueText);
 			}
 		}
 	}
@@ -77,12 +72,30 @@ void UMC_Overlay::NativeConstruct()
 		UE_LOG(LogTemp, Warning, TEXT("MC_Overlay.cpp - can't find NoiseManager"));
 	}
 	
-	auto HorizBox = WidgetTree->ConstructWidget<UHorizontalBox>();
-	PlayerPos = WidgetTree->ConstructWidget<UTextBlock>();
-	PlayerPos->SetColorAndOpacity(Color);
-	HorizBox->AddChild(PlayerPos);
-	VerticalBox->AddChild(HorizBox);
+	AddTextRow(FText::FromString(TEXT("Position:")), PlayerPos);
+	AddTextRow(FText::FromString(TEXT("Chunk:")), ChunkPos);
 	
 	GetWorld()->GetTimerManager().SetTimer(TimerUpdateNoises,this,&UMC_Overlay::UpdateUI,0.1f,true);
 	UpdateUI();
 }
+
+void UMC_Overlay::AddTextRow(const FText& Label, UTextBlock*& OutTextBlock)
+{
+	if (!VerticalBox)
+		return;
+
+	FSlateColor Color(FLinearColor::Black);
+	auto HorizBox = WidgetTree->ConstructWidget<UHorizontalBox>();
+	
+	UTextBlock* LabelText = WidgetTree->ConstructWidget<UTextBlock>();
+	LabelText->SetText(Label);
+	LabelText->SetColorAndOpacity(Color);
+	
+	OutTextBlock = WidgetTree->ConstructWidget<UTextBlock>();
+	OutTextBlock->SetColorAndOpacity(Color);
+	
+	HorizBox->AddChild(LabelText);
+	HorizBox->AddChild(OutTextBlock);
+	VerticalBox->AddChild(HorizBox);
+}
+
