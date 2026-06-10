@@ -99,6 +99,4 @@ private:
 	bool bIsGeneratingChunk = false;
 public:
 	void GenerateChunkData(FChunkBuildData& Data);
-	UFUNCTION()
-	void UpdateChunks(FVector coord);
 };
