@@ -40,9 +40,7 @@ private:
 	void AddQuad(EFace Face, int x, int y, int z, int w, int h, BlockType Type);
 	const FChunkBuildData* Chunk=nullptr;
 public:
-	void Clear();
 	void BuildGreedyMesh(const FChunkBuildData* Data);
-	void BuildMesh(const FChunkBuildData& Data);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat);
 	

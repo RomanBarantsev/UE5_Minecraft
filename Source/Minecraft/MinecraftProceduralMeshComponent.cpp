@@ -15,23 +15,3 @@ UMinecraftProceduralMeshComponent::UMinecraftProceduralMeshComponent(const FObje
 	// ...
 }
 
-
-// Called when the game starts
-void UMinecraftProceduralMeshComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// ...
-	
-}
-
-
-// Called every frame
-void UMinecraftProceduralMeshComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-                                                      FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	// ...
-}
-

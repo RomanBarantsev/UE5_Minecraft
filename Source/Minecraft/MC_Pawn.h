@@ -26,13 +26,9 @@ protected:
 	FTimerHandle WorldUpdateTimerHandle;
 	void WorldUpdate();
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-	void PlaceAboveSurface();
 	void Fire();
 	UPROPERTY()
 	UChunkWorldSubsystem* ChunkWorldSubsystem;
-	void Redraw();
 	UFUNCTION()
 	FVector GetPlayerVoxelPos();
 	// Called to bind functionality to input

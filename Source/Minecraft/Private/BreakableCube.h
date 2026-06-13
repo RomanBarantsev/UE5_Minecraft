@@ -16,14 +16,10 @@ class MINECRAFT_API ABreakableCube : public AActor
 
 public:
 	ABreakableCube();
-
-protected:
-	virtual void BeginPlay() override;
 public:		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Destruction")
 	UGeometryCollectionComponent * GeometryCollectionComponent;
 	void FractureNow(BlockType type, FHitResult hit);
-	void Reset();
 private:
 	UPROPERTY(EditAnywhere)
 	UMaterialInterface* AtlasMaterial;

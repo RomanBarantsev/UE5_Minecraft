@@ -16,7 +16,7 @@ class UProceduralMeshComponent;
 
 AChunkGenerator::AChunkGenerator()
 {
-	PrimaryActorTick.bCanEverTick = true;	
+	PrimaryActorTick.bCanEverTick = false;
 	// Создаём корневой компонент
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 		
@@ -39,12 +39,6 @@ void AChunkGenerator::BeginPlay()
 		ChunkWorldSubsystem->SetChunkGenerator(this);
 		ChunkWorldSubsystem->UpdateChunks(FVector::ZeroVector);
 	}
-}
-
-void AChunkGenerator::Tick(float DeltaSeconds)
-{	
-	Super::Tick(DeltaSeconds);	
-	
 }
 
 void AChunkGenerator::LoadAllBioms()

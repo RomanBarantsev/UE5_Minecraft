@@ -50,13 +50,3 @@ void ABreakableCube::FractureNow(BlockType type, FHitResult hit)
             MakeShared<FUniformVector>(ViewDir * 3000.f));*/
     }    
 }
-
-void ABreakableCube::Reset()
-{
-   
-}
-
-void ABreakableCube::BeginPlay()
-{
-    Super::BeginPlay();
-}

@@ -91,15 +91,6 @@ bool FGreedyMeshing::IsAir(int x, int y, int z)
 	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
 
-void FGreedyMeshing::Clear()
-{
-	Vertices.Empty();
-	Triangles.Empty();
-	Normals.Empty();
-	UVs.Empty();
-	UV1s.Empty();
-}
-
 void FGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
 {	
 	Chunk = Data;
@@ -109,11 +100,6 @@ void FGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
 	GreedyFace(EFace::NegX);
 	GreedyFace(EFace::PosY);
 	GreedyFace(EFace::NegY);
-}
-
-void FGreedyMeshing::BuildMesh(const FChunkBuildData& Data)
-{
-	
 }
 
 float FGreedyMeshing::GetTileIndex(BlockType Type)
@@ -324,7 +310,6 @@ FVector FGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,U
 	procMesh.SetCollisionObjectType(ECC_WorldDynamic);
 	procMesh.SetCollisionResponseToAllChannels(ECR_Block);
 	
-	procMesh.SetIndex(0);
 	procMesh.SetMaterial(0, Mat);
 	Vertices.Reset();
 	Triangles.Reset();

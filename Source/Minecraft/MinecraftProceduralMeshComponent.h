@@ -15,15 +15,4 @@ class MINECRAFT_API UMinecraftProceduralMeshComponent : public UProceduralMeshCo
 public:
 	// Sets default values for this component's properties
 	UMinecraftProceduralMeshComponent(const FObjectInitializer& ObjectInitializer);
-
-protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
-	int64 Index;
-public:
-	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
-	                           FActorComponentTickFunction* ThisTickFunction) override;
-	void SetIndex(int i){Index=i;}
-	int64 GetIndex() const {return Index;}
 };

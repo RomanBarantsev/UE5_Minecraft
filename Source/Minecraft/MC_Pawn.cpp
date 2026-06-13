@@ -33,7 +33,6 @@ void AMC_Pawn::BeginPlay()
 	{
 		UE_LOG(LogTemp,Error,TEXT("ChunkWorldSubsystem is nullptr"));
 	}
-	//PlaceAboveSurface();
 	GetWorld()->GetTimerManager().SetTimer(WorldUpdateTimerHandle,this,&AMC_Pawn::WorldUpdate,1.0f,true,0);
 }
 
@@ -43,21 +42,6 @@ void AMC_Pawn::WorldUpdate()
 	{
 		ChunkWorldSubsystem->UpdateChunks(GetActorLocation());		
 	}
-}
-
-// Called every frame
-void AMC_Pawn::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
-
-void AMC_Pawn::PlaceAboveSurface()
-{
-	if (!ChunkWorldSubsystem)
-		return;
-	auto height = ChunkWorldSubsystem->GetSurfaceHighInPos(GetActorLocation());
-	SetActorLocation(GetActorLocation() + FVector(0,0,height*BLOCK_SIZE+PawnSize));
-	UE_LOG(LogTemp,Warning,TEXT("height %d"),height);
 }
 
 void AMC_Pawn::Fire()

@@ -60,6 +60,5 @@ class MINECRAFT_API UChunkWorldSubsystem : public UWorldSubsystem
 public:	
 	void SetChunkGenerator(AChunkGenerator* InChunkGenerator);
 	void UpdateChunks(FVector coord);
-	int GetSurfaceHighInPos(FVector vec);
 	void RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh);
 };

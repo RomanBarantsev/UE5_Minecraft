@@ -15,7 +15,6 @@ class MINECRAFT_API UBiomDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
 public:
-	UBiomDataAsset();
 	UPROPERTY(EditAnywhere, Category = "Climate")
 	float TargetTemperature;
 

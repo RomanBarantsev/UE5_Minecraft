@@ -210,21 +210,6 @@ void UChunkWorldSubsystem::Tick()
 	AsyncChunkCreate(GenerateArray);	
 }
 
-int UChunkWorldSubsystem::GetSurfaceHighInPos(FVector vec)
-{
-	int XChunkCoord = FMath::FloorToInt(vec.X / BLOCK_SIZE);
-	int YChunkCoord = FMath::FloorToInt(vec.Y / BLOCK_SIZE);
-	int XChunk = XChunkCoord/CHUNKSIZE_WIDE;
-	int YChunk = YChunkCoord/CHUNKSIZE_WIDE;
-	FChunkCoord Coord{XChunk,YChunk};
-	if (!Chunks.Contains(Coord))
-		return 0;
-	auto chunk = Chunks[Coord];
-	if (!chunk.IsValid())
-		return 0;
-	return chunk->GetSurfaceHeight(XChunkCoord,YChunkCoord);
-}
-
 void UChunkWorldSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
 {
 	FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;

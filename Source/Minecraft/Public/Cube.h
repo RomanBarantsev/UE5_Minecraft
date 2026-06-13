@@ -17,13 +17,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	UStaticMeshComponent* StaticMesh;
 	
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
 	UFUNCTION()
 	virtual void Fall(bool state);
 	UFUNCTION()

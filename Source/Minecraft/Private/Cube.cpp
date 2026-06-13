@@ -10,7 +10,7 @@
 ACube::ACube()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
 	SetRootComponent(StaticMesh);
 	UStaticMesh* NewMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Script/Engine.StaticMesh'/Game/Cube.Cube'"));
@@ -26,18 +26,6 @@ ACube::ACube()
 	StaticMesh->bIgnoreRadialForce = true;
 	StaticMesh->bIgnoreRadialForce = true;
 	StaticMesh->SetSimulatePhysics(false);
-}
-
-// Called when the game starts or when spawned
-void ACube::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
-// Called every frame
-void ACube::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
 }
 
 void ACube::Fall(bool state)
