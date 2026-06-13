@@ -54,17 +54,17 @@ constexpr int BLOCK_SIZE = 256;
 constexpr int BEDROCK_BASE = 0;
 constexpr int BEDROCK_HEIGHT = 5;
 
-constexpr int CHUNK_X = 64;
-constexpr int CHUNK_Y = 64;
-constexpr int CHUNK_Z = 256;
+constexpr int CHUNK_X_SIZE = 64;
+constexpr int CHUNK_Y_SIZE = 64;
+constexpr int CHUNK_Z_SIZE = 256;
 constexpr uint8_t MIN_HEIGHT = 20;
 constexpr uint8_t MAX_HEIGHT = 96;
 constexpr int Z_STRIDE = 1;
-constexpr int Y_STRIDE = CHUNK_Z;
-constexpr int X_STRIDE = CHUNK_Z * CHUNK_Y;
+constexpr int Y_STRIDE = CHUNK_Z_SIZE;
+constexpr int X_STRIDE = CHUNK_Z_SIZE * CHUNK_Y_SIZE;
 
-constexpr int TOTAL_BLOCKS = CHUNK_X * CHUNK_Y * CHUNK_Z;
-constexpr float CHUNKSIZE_WIDE = BLOCK_SIZE*CHUNK_X;
+constexpr int TOTAL_BLOCKS = CHUNK_X_SIZE * CHUNK_Y_SIZE * CHUNK_Z_SIZE;
+constexpr float CHUNKSIZE_WIDE = BLOCK_SIZE*CHUNK_X_SIZE;
 
 struct FChunkBuildData
 {
@@ -73,7 +73,7 @@ private:
 	std::vector<uint8> SurfaceHeights;
 	
 public:
-	FChunkCoord Coord;
+	FChunkCoord ChunkCoord;
 	FChunkBuildData();
 
 	FORCEINLINE int Index(int x, int y, int z) const
@@ -82,7 +82,7 @@ public:
 	}
 	FORCEINLINE int SurfaceIndex(int x, int y) const
 	{
-		return x + y * CHUNK_X;
+		return x + y * CHUNK_X_SIZE;
 	}
 	FORCEINLINE BlockType GetBlock(int x, int y, int z) const
 	{

@@ -63,8 +63,8 @@ void UChunkWorldSubsystem::UpdateChunks(FVector coord)
 	}
 	coord/=BLOCK_SIZE;
 	FChunkCoord chunkCoord;
-	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X);
-	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
+	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X_SIZE);
+	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y_SIZE);
 		
 	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDeep/2
 	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDeep/2
@@ -131,12 +131,12 @@ void UChunkWorldSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& 
 	{
 		ProcMesh = FreeProcMeshes.Pop();		
 	}
-	ProcMesh->SetRelativeLocation(FVector(Data.Coord.x*CHUNK_X*BLOCK_SIZE, Data.Coord.y*CHUNK_Y*BLOCK_SIZE, 0));
+	ProcMesh->SetRelativeLocation(FVector(Data.ChunkCoord.x*CHUNK_X_SIZE*BLOCK_SIZE, Data.ChunkCoord.y*CHUNK_Y_SIZE*BLOCK_SIZE, 0));
 	GreedyMeshing.CreateMesh(*ProcMesh,BlocksMatertial);
-	MeshesMap.Add(Data.Coord,ProcMesh);
-	if (Chunks.Contains(Data.Coord))
+	MeshesMap.Add(Data.ChunkCoord,ProcMesh);
+	if (Chunks.Contains(Data.ChunkCoord))
 	{
-		MeshToChunkMap.Add(ProcMesh, Chunks[Data.Coord].Get());
+		MeshToChunkMap.Add(ProcMesh, Chunks[Data.ChunkCoord].Get());
 	}
 }
 
@@ -162,7 +162,7 @@ void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateA
 			FChunkCoord CurrentCoord = GenerateArray[i];
 			
 			TSharedPtr<FChunkBuildData> Data = MakeShared<FChunkBuildData>();
-			Data->Coord = CurrentCoord;
+			Data->ChunkCoord = CurrentCoord;
 			
 			WeakGenerator->GenerateChunkData(*Data);
 			
@@ -235,8 +235,8 @@ void UChunkWorldSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshC
 	LocalPos/=BLOCK_SIZE;
 	
 	FChunkCoord chunkCoord;
-	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X);
-	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y);
+	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X_SIZE);
+	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y_SIZE);
 	if (!MeshToChunkMap.Contains(mesh))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Mesh not found in MeshToChunkMap"));

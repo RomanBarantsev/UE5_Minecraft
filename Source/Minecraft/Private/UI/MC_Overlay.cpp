@@ -29,8 +29,8 @@ void UMC_Overlay::UpdateUI()
 	FText::AsNumber(CurrentCoord.Z));
 	PlayerPos->SetText(PosText);
 	CurrentCoord=coord;	
-	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X);
-	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y);
+	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X_SIZE);
+	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y_SIZE);
 	
 	FText ChunkText = FText::Format(
 	NSLOCTEXT("MyNamespace", "ChunkPosKey", "Chunk X: {0} Y: {1}"), 

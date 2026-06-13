@@ -22,7 +22,7 @@ bool FGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 
 bool FGreedyMeshing::IsAir(int x, int y, int z)
 {
-	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X || y >= CHUNK_X || z >= CHUNK_Z)
+	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X_SIZE || y >= CHUNK_X_SIZE || z >= CHUNK_Z_SIZE)
 		return true; 
 	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
@@ -60,23 +60,23 @@ float FGreedyMeshing::GetTileIndex(BlockType Type)
 void FGreedyMeshing::GreedyZPos(bool bPositive)
 {
 	
-	FMaskCell Mask[CHUNK_X][CHUNK_X];
+	FMaskCell Mask[CHUNK_X_SIZE][CHUNK_X_SIZE];
 	int dz = bPositive ? 1 : -1;
 
-	for (int z = 0; z < CHUNK_Z; z++)
+	for (int z = 0; z < CHUNK_Z_SIZE; z++)
 	{
-		for (int x = 0; x < CHUNK_X; x++)
+		for (int x = 0; x < CHUNK_X_SIZE; x++)
 		{
-			for (int y = 0; y < CHUNK_X; y++)
+			for (int y = 0; y < CHUNK_X_SIZE; y++)
 			{
 				Mask[x][y].bValid = false;
 			}
 		}
-		for (int x = 0; x < CHUNK_X; x++)
-			for (int y = 0; y < CHUNK_X; y++)
+		for (int x = 0; x < CHUNK_X_SIZE; x++)
+			for (int y = 0; y < CHUNK_X_SIZE; y++)
 			{
 				int nz = z + dz;
-				if (nz < 0 || nz >= CHUNK_Z) continue;
+				if (nz < 0 || nz >= CHUNK_Z_SIZE) continue;
 
 				if (IsFaceVisible(x, y, z, 0, 0, dz))
 				{
@@ -84,8 +84,8 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 					Mask[x][y].Type =  Chunk->GetBlock(x,y,z);
 				}
 			}
-		for (int x = 0; x < CHUNK_X; x++)
-			for (int y = 0; y < CHUNK_X; y++)
+		for (int x = 0; x < CHUNK_X_SIZE; x++)
+			for (int y = 0; y < CHUNK_X_SIZE; y++)
 			{
 				if (!Mask[x][y].bValid)
 					continue;
@@ -93,7 +93,7 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 				BlockType Type = Mask[x][y].Type;
 
 				int width = 1;
-				while (x + width < CHUNK_X &&
+				while (x + width < CHUNK_X_SIZE &&
 					   Mask[x + width][y].bValid &&
 					   Mask[x + width][y].Type == Type)
 				{
@@ -102,7 +102,7 @@ void FGreedyMeshing::GreedyZPos(bool bPositive)
 
 				int height = 1;
 				bool done = false;
-				while (y + height < CHUNK_X && !done)
+				while (y + height < CHUNK_X_SIZE && !done)
 				{
 					for (int i = 0; i < width; i++)
 					{
@@ -196,17 +196,17 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
 {
     int dx = bPositive ? 1 : -1;
 
-    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X, std::vector<FMaskCell>(CHUNK_Z));
+    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X_SIZE, std::vector<FMaskCell>(CHUNK_Z_SIZE));
 
-    for (int x = 0; x < CHUNK_X; x++)
+    for (int x = 0; x < CHUNK_X_SIZE; x++)
     {
-        for (int y = 0; y < CHUNK_X; y++)
-            for (int z = 0; z < CHUNK_Z; z++)
+        for (int y = 0; y < CHUNK_X_SIZE; y++)
+            for (int z = 0; z < CHUNK_Z_SIZE; z++)
                 Mask[y][z].bValid = false;
 
-        for (int y = 0; y < CHUNK_X; y++)
+        for (int y = 0; y < CHUNK_X_SIZE; y++)
         {
-            for (int z = 0; z < CHUNK_Z; z++)
+            for (int z = 0; z < CHUNK_Z_SIZE; z++)
             {
                 if (IsFaceVisible(x, y, z, dx, 0, 0))
                 {
@@ -216,9 +216,9 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
             }
         }
 
-        for (int y = 0; y < CHUNK_X; y++)
+        for (int y = 0; y < CHUNK_X_SIZE; y++)
         {
-            for (int z = 0; z < CHUNK_Z; z++)
+            for (int z = 0; z < CHUNK_Z_SIZE; z++)
             {
                 if (!Mask[y][z].bValid)
                     continue;
@@ -226,7 +226,7 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
                 BlockType CurrentType = Mask[y][z].Type;
 
                 int width = 1;
-                while (y + width < CHUNK_X &&
+                while (y + width < CHUNK_X_SIZE &&
                        Mask[y + width][z].bValid &&
                        Mask[y + width][z].Type == CurrentType)
                 {
@@ -235,7 +235,7 @@ void FGreedyMeshing::GreedyXPos(bool bPositive)
 
                 int height = 1;
                 bool done = false;
-                while (z + height < CHUNK_Z && !done)
+                while (z + height < CHUNK_Z_SIZE && !done)
                 {
                     for (int i = 0; i < width; i++)
                     {
@@ -351,17 +351,17 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
 {
     int dy = bPositive ? 1 : -1;
 
-    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X, std::vector<FMaskCell>(CHUNK_Z));
+    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X_SIZE, std::vector<FMaskCell>(CHUNK_Z_SIZE));
 
-    for (int y = 0; y < CHUNK_X; y++)
+    for (int y = 0; y < CHUNK_X_SIZE; y++)
     {
-        for (int x = 0; x < CHUNK_X; x++)
-            for (int z = 0; z < CHUNK_Z; z++)
+        for (int x = 0; x < CHUNK_X_SIZE; x++)
+            for (int z = 0; z < CHUNK_Z_SIZE; z++)
                 Mask[x][z].bValid = false;
 
-        for (int x = 0; x < CHUNK_X; x++)
+        for (int x = 0; x < CHUNK_X_SIZE; x++)
         {
-            for (int z = 0; z < CHUNK_Z; z++)
+            for (int z = 0; z < CHUNK_Z_SIZE; z++)
             {
                 if (IsFaceVisible(x, y, z, 0, dy, 0))
                 {
@@ -371,9 +371,9 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
             }
         }
 
-        for (int x = 0; x < CHUNK_X; x++)
+        for (int x = 0; x < CHUNK_X_SIZE; x++)
         {
-            for (int z = 0; z < CHUNK_Z; z++)
+            for (int z = 0; z < CHUNK_Z_SIZE; z++)
             {
                 if (!Mask[x][z].bValid)
                     continue;
@@ -381,7 +381,7 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
                 BlockType CurrentType = Mask[x][z].Type;
 
                 int width = 1;
-                while (x + width < CHUNK_X &&
+                while (x + width < CHUNK_X_SIZE &&
                        Mask[x + width][z].bValid &&
                        Mask[x + width][z].Type == CurrentType)
                 {
@@ -390,7 +390,7 @@ void FGreedyMeshing::GreedyYPos(bool bPositive)
 
                 int height = 1;
                 bool done = false;
-                while (z + height < CHUNK_Z && !done)
+                while (z + height < CHUNK_Z_SIZE && !done)
                 {
                     for (int i = 0; i < width; i++)
                     {

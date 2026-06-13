@@ -3,21 +3,21 @@
 FChunkBuildData::FChunkBuildData()
 {
 	Blocks.resize(TOTAL_BLOCKS, BlockType::Empty);
-	SurfaceHeights.resize(CHUNK_X * CHUNK_Y, 0);
+	SurfaceHeights.resize(CHUNK_X_SIZE * CHUNK_Y_SIZE, 0);
 }
 
 void FChunkBuildData::Fill()
 {
-	for (int x = 0; x < CHUNK_X; x++)
+	for (int x = 0; x < CHUNK_X_SIZE; x++)
 	{
 		const int xOff = x * X_STRIDE;
 
-		for (int y = 0; y < CHUNK_Y; y++)
+		for (int y = 0; y < CHUNK_Y_SIZE; y++)
 		{
 			const int yOff = xOff + y * Y_STRIDE;
 			const int surface = SurfaceHeights[SurfaceIndex(x,y)];
 
-			for (int z = 0; z < CHUNK_Z; z++)
+			for (int z = 0; z < CHUNK_Z_SIZE; z++)
 			{
 				const int idx = yOff + z;
 
