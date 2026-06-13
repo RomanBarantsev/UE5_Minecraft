@@ -93,7 +93,7 @@ private:
 	float GetHeightMask(int z, int minZ, int maxZ);
 	FInterpolatedBiomeData GetInterpolatedLUTData(float T, float H);
 	int CalculateHeight(FNoises noises);
-	void GenerateCaves(FChunkBuildData& Data);
+	void GenerateCaves(FChunkBuildData& Data,int x,int y);
 	void GenerateSurfaceLayer(int z, FNoises& noises, FChunkBuildData& Data, int x, int y);
 	
 	bool bIsGeneratingChunk = false;
