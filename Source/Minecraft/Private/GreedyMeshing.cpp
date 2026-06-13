@@ -6,6 +6,70 @@
 #include "Minecraft/FChunkBuildData.h"
 #include "Minecraft/MinecraftProceduralMeshComponent.h"
 
+namespace
+{
+	struct FFaceConfig
+	{
+		int NormalAxis;
+		int UAxis;
+		int VAxis;
+		int NormalSign;
+		FVector Normal;
+	};
+
+	int GetAxisSize(int Axis)
+	{
+		switch (Axis)
+		{
+		case 0: return CHUNK_X_SIZE;
+		case 1: return CHUNK_Y_SIZE;
+		default: return CHUNK_Z_SIZE;
+		}
+	}
+
+	FFaceConfig GetFaceConfig(EFace Face)
+	{
+		switch (Face)
+		{
+		case EFace::PosX:
+			return { 0, 1, 2, 1, FVector(1, 0, 0) };
+		case EFace::NegX:
+			return { 0, 1, 2, -1, FVector(-1, 0, 0) };
+		case EFace::PosY:
+			return { 1, 0, 2, 1, FVector(0, 1, 0) };
+		case EFace::NegY:
+			return { 1, 0, 2, -1, FVector(0, -1, 0) };
+		case EFace::PosZ:
+			return { 2, 0, 1, 1, FVector::UpVector };
+		case EFace::NegZ:
+			return { 2, 0, 1, -1, FVector::DownVector };
+		default:
+			return { 2, 0, 1, 1, FVector::UpVector };
+		}
+	}
+
+	bool UsesVFirstVertexOrder(EFace Face)
+	{
+		return Face == EFace::PosX || Face == EFace::NegY || Face == EFace::PosZ;
+	}
+
+	void SetVectorAxis(FVector& Vector, int Axis, float Value)
+	{
+		switch (Axis)
+		{
+		case 0:
+			Vector.X = Value;
+			break;
+		case 1:
+			Vector.Y = Value;
+			break;
+		default:
+			Vector.Z = Value;
+			break;
+		}
+	}
+}
+
 FGreedyMeshing::FGreedyMeshing()
 {
 }
@@ -22,7 +86,7 @@ bool FGreedyMeshing::IsFaceVisible(	int x, int y, int z,int dx, int dy, int dz)
 
 bool FGreedyMeshing::IsAir(int x, int y, int z)
 {
-	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X_SIZE || y >= CHUNK_X_SIZE || z >= CHUNK_Z_SIZE)
+	if (x < 0 || y < 0 || z < 0 || x >= CHUNK_X_SIZE || y >= CHUNK_Y_SIZE || z >= CHUNK_Z_SIZE)
 		return true; 
 	return  Chunk->GetBlock(x,y,z) == BlockType::Air;
 }
@@ -39,12 +103,12 @@ void FGreedyMeshing::Clear()
 void FGreedyMeshing::BuildGreedyMesh(const FChunkBuildData* Data)
 {	
 	Chunk = Data;
-	GreedyZPos( true);
-	GreedyZPos( false);
-	GreedyXPos( true);
-	GreedyXPos( false);
-	GreedyYPos( true);
-	GreedyYPos( false);
+	GreedyFace(EFace::PosZ);
+	GreedyFace(EFace::NegZ);
+	GreedyFace(EFace::PosX);
+	GreedyFace(EFace::NegX);
+	GreedyFace(EFace::PosY);
+	GreedyFace(EFace::NegY);
 }
 
 void FGreedyMeshing::BuildMesh(const FChunkBuildData& Data)
@@ -57,442 +121,188 @@ float FGreedyMeshing::GetTileIndex(BlockType Type)
 	return (float)Type;
 }
 
-void FGreedyMeshing::GreedyZPos(bool bPositive)
+void FGreedyMeshing::GreedyFace(EFace Face)
 {
-	
-	FMaskCell Mask[CHUNK_X_SIZE][CHUNK_X_SIZE];
-	int dz = bPositive ? 1 : -1;
+	const FFaceConfig Config = GetFaceConfig(Face);
+	const int SliceSize = GetAxisSize(Config.NormalAxis);
+	const int USize = GetAxisSize(Config.UAxis);
+	const int VSize = GetAxisSize(Config.VAxis);
 
-	for (int z = 0; z < CHUNK_Z_SIZE; z++)
+	std::vector<FMaskCell> Mask(USize * VSize);
+	auto MaskAt = [&](int U, int V) -> FMaskCell&
 	{
-		for (int x = 0; x < CHUNK_X_SIZE; x++)
+		return Mask[U + V * USize];
+	};
+
+	for (int Slice = 0; Slice < SliceSize; Slice++)
+	{
+		for (FMaskCell& Cell : Mask)
 		{
-			for (int y = 0; y < CHUNK_X_SIZE; y++)
+			Cell.bValid = false;
+		}
+
+		for (int U = 0; U < USize; U++)
+		{
+			for (int V = 0; V < VSize; V++)
 			{
-				Mask[x][y].bValid = false;
+				int Coords[3] = {};
+				int Delta[3] = {};
+				Coords[Config.NormalAxis] = Slice;
+				Coords[Config.UAxis] = U;
+				Coords[Config.VAxis] = V;
+				Delta[Config.NormalAxis] = Config.NormalSign;
+
+				const int NeighborSlice = Slice + Config.NormalSign;
+				if (Config.NormalAxis == 2 && (NeighborSlice < 0 || NeighborSlice >= SliceSize))
+				{
+					continue;
+				}
+
+				if (IsFaceVisible(Coords[0], Coords[1], Coords[2], Delta[0], Delta[1], Delta[2]))
+				{
+					MaskAt(U, V).bValid = true;
+					MaskAt(U, V).Type = Chunk->GetBlock(Coords[0], Coords[1], Coords[2]);
+				}
 			}
 		}
-		for (int x = 0; x < CHUNK_X_SIZE; x++)
-			for (int y = 0; y < CHUNK_X_SIZE; y++)
-			{
-				int nz = z + dz;
-				if (nz < 0 || nz >= CHUNK_Z_SIZE) continue;
 
-				if (IsFaceVisible(x, y, z, 0, 0, dz))
-				{
-					Mask[x][y].bValid = true;
-					Mask[x][y].Type =  Chunk->GetBlock(x,y,z);
-				}
-			}
-		for (int x = 0; x < CHUNK_X_SIZE; x++)
-			for (int y = 0; y < CHUNK_X_SIZE; y++)
+		for (int U = 0; U < USize; U++)
+		{
+			for (int V = 0; V < VSize; V++)
 			{
-				if (!Mask[x][y].bValid)
+				if (!MaskAt(U, V).bValid)
+				{
 					continue;
-
-				BlockType Type = Mask[x][y].Type;
-
-				int width = 1;
-				while (x + width < CHUNK_X_SIZE &&
-					   Mask[x + width][y].bValid &&
-					   Mask[x + width][y].Type == Type)
-				{
-					width++;
 				}
 
-				int height = 1;
-				bool done = false;
-				while (y + height < CHUNK_X_SIZE && !done)
+				BlockType CurrentType = MaskAt(U, V).Type;
+
+				int Width = 1;
+				while (U + Width < USize &&
+					MaskAt(U + Width, V).bValid &&
+					MaskAt(U + Width, V).Type == CurrentType)
 				{
-					for (int i = 0; i < width; i++)
+					Width++;
+				}
+
+				int Height = 1;
+				bool bDone = false;
+				while (V + Height < VSize && !bDone)
+				{
+					for (int i = 0; i < Width; i++)
 					{
-						if (!Mask[x + i][y + height].bValid ||
-							Mask[x + i][y + height].Type != Type)
+						if (!MaskAt(U + i, V + Height).bValid ||
+							MaskAt(U + i, V + Height).Type != CurrentType)
 						{
-							done = true;
+							bDone = true;
 							break;
 						}
 					}
-					if (!done) height++;
+					if (!bDone)
+					{
+						Height++;
+					}
 				}
-				AddQuadZ(x, y, z, width, height, bPositive, Type);
-				for (int dx = 0; dx < width; dx++)
-					for (int dy = 0; dy < height; dy++)
-						Mask[x + dx][y + dy].bValid = false;
+
+				int Coords[3] = {};
+				Coords[Config.NormalAxis] = Slice;
+				Coords[Config.UAxis] = U;
+				Coords[Config.VAxis] = V;
+				AddQuad(Face, Coords[0], Coords[1], Coords[2], Width, Height, CurrentType);
+
+				for (int ClearU = 0; ClearU < Width; ClearU++)
+				{
+					for (int ClearV = 0; ClearV < Height; ClearV++)
+					{
+						MaskAt(U + ClearU, V + ClearV).bValid = false;
+					}
+				}
 			}
+		}
 	}
 }
 
-void FGreedyMeshing::AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
+void FGreedyMeshing::AddQuad(EFace Face, int x, int y, int z, int w, int h, BlockType Type)
 {
-    float zPos = bPositive ? (z + 1) * BLOCK_SIZE : z * BLOCK_SIZE;
+	const FFaceConfig Config = GetFaceConfig(Face);
+	const int CoordValues[3] = { x, y, z };
+	float BaseCoords[3] = {
+		static_cast<float>(x * BLOCK_SIZE),
+		static_cast<float>(y * BLOCK_SIZE),
+		static_cast<float>(z * BLOCK_SIZE)
+	};
+	BaseCoords[Config.NormalAxis] = static_cast<float>(
+		(CoordValues[Config.NormalAxis] + (Config.NormalSign > 0 ? 1 : 0)) * BLOCK_SIZE);
 
-    FVector base(
-        x * BLOCK_SIZE,
-        y * BLOCK_SIZE,
-        zPos
-    );
+	FVector Base(BaseCoords[0], BaseCoords[1], BaseCoords[2]);
+	FVector U = FVector::ZeroVector;
+	FVector V = FVector::ZeroVector;
+	SetVectorAxis(U, Config.UAxis, static_cast<float>(w * BLOCK_SIZE));
+	SetVectorAxis(V, Config.VAxis, static_cast<float>(h * BLOCK_SIZE));
 
-    FVector dx(w * BLOCK_SIZE, 0, 0);
-    FVector dy(0, h * BLOCK_SIZE, 0);
-
-    int start = Vertices.Num();
-
-    if (bPositive)
-    {
-        Vertices.Add(base);                     // 0: нижний-левый
-        Vertices.Add(base + dy);                // 1: верхний-левый  
-        Vertices.Add(base + dx + dy);           // 2: верхний-правый
-        Vertices.Add(base + dx);                // 3: нижний-правый
-        
-        Triangles.Append({ start, start + 1, start + 2,
-                          start, start + 2, start + 3 });
-        Normals.Append({ FVector::UpVector, FVector::UpVector,
-                        FVector::UpVector, FVector::UpVector });
-    }
-    else
-    {
-        Vertices.Add(base);                     // 0: нижний-левый
-        Vertices.Add(base + dx);                // 1: нижний-правый
-        Vertices.Add(base + dx + dy);           // 2: верхний-правый
-        Vertices.Add(base + dy);                // 3: верхний-левый
-        
-        Triangles.Append({ start, start + 1, start + 2,
-                          start, start + 2, start + 3 });
-        Normals.Append({ FVector::DownVector, FVector::DownVector,
-                        FVector::DownVector, FVector::DownVector });
-    }
-    
-    const float AtlasSize = 4.0f;
-	const float TileSize = 1.0f / AtlasSize;
-
-	float tileIndex = GetTileIndex(Type);
-	int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
-	int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
-
-	float baseU = tileX * TileSize;
-	float baseV = tileY * TileSize;
-
-	if (bPositive)
+	const int Start = Vertices.Num();
+	if (UsesVFirstVertexOrder(Face))
 	{
-		UVs.Add({0, 0});
-		UVs.Add({0, (float)h});
-		UVs.Add({(float)w, (float)h});
-		UVs.Add({(float)w, 0});
+		Vertices.Add(Base);
+		Vertices.Add(Base + V);
+		Vertices.Add(Base + U + V);
+		Vertices.Add(Base + U);
 	}
 	else
 	{
-		UVs.Add({(float)w, 0});
-		UVs.Add({0, 0});
-		UVs.Add({0, (float)h});
-		UVs.Add({(float)w, (float)h});
+		Vertices.Add(Base);
+		Vertices.Add(Base + U);
+		Vertices.Add(Base + U + V);
+		Vertices.Add(Base + V);
 	}
 
+	Triangles.Append({ Start, Start + 1, Start + 2, Start, Start + 2, Start + 3 });
 	for (int i = 0; i < 4; i++)
-		UV1s.Add({ baseU, baseV });
-}
-
-void FGreedyMeshing::GreedyXPos(bool bPositive)
-{
-    int dx = bPositive ? 1 : -1;
-
-    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X_SIZE, std::vector<FMaskCell>(CHUNK_Z_SIZE));
-
-    for (int x = 0; x < CHUNK_X_SIZE; x++)
-    {
-        for (int y = 0; y < CHUNK_X_SIZE; y++)
-            for (int z = 0; z < CHUNK_Z_SIZE; z++)
-                Mask[y][z].bValid = false;
-
-        for (int y = 0; y < CHUNK_X_SIZE; y++)
-        {
-            for (int z = 0; z < CHUNK_Z_SIZE; z++)
-            {
-                if (IsFaceVisible(x, y, z, dx, 0, 0))
-                {
-                    Mask[y][z].bValid = true;
-                    Mask[y][z].Type =  Chunk->GetBlock(x,y,z);
-                }
-            }
-        }
-
-        for (int y = 0; y < CHUNK_X_SIZE; y++)
-        {
-            for (int z = 0; z < CHUNK_Z_SIZE; z++)
-            {
-                if (!Mask[y][z].bValid)
-                    continue;
-
-                BlockType CurrentType = Mask[y][z].Type;
-
-                int width = 1;
-                while (y + width < CHUNK_X_SIZE &&
-                       Mask[y + width][z].bValid &&
-                       Mask[y + width][z].Type == CurrentType)
-                {
-                    width++;
-                }
-
-                int height = 1;
-                bool done = false;
-                while (z + height < CHUNK_Z_SIZE && !done)
-                {
-                    for (int i = 0; i < width; i++)
-                    {
-                        if (!Mask[y + i][z + height].bValid ||
-                            Mask[y + i][z + height].Type != CurrentType)
-                        {
-                            done = true;
-                            break;
-                        }
-                    }
-                    if (!done) height++;
-                }
-
-                AddQuadX(x, y, z, width, height, bPositive, CurrentType);
-
-                for (int dy = 0; dy < width; dy++)
-                {
-                    for (int dz = 0; dz < height; dz++)
-                    {
-                        Mask[y + dy][z + dz].bValid = false;
-                    }
-                }
-            }
-        }
-    }
-}
-
-void FGreedyMeshing::AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
-{
-    float xCoord;
-    FVector Normal;
-    
-    if (bPositive)
-    {
-        xCoord = (x + 1) * BLOCK_SIZE;
-        Normal = FVector(1, 0, 0);
-    }
-    else
-    {
-        xCoord = x * BLOCK_SIZE;
-        Normal = FVector(-1, 0, 0); 
-    }
-    
-    float baseY = y * BLOCK_SIZE;
-    float baseZ = z * BLOCK_SIZE;
-    
-    float quadWidth = w * BLOCK_SIZE;  
-    float quadHeight = h * BLOCK_SIZE;
-    
-    int start = Vertices.Num();
-
-    if (bPositive)
-    {
-        Vertices.Add(FVector(xCoord, baseY, baseZ));                     
-        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));        
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); 
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));        
-        
-        Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
-    }
-    else
-    {
-        // X-: нормаль влево (-X)
-        Vertices.Add(FVector(xCoord, baseY, baseZ));                    
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ));         
-        Vertices.Add(FVector(xCoord, baseY + quadWidth, baseZ + quadHeight)); 
-        Vertices.Add(FVector(xCoord, baseY, baseZ + quadHeight));       
-        
-        Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
-    }
-    
-    for (int i = 0; i < 4; i++)
-    {
-        Normals.Add(Normal);
-    }
+	{
+		Normals.Add(Config.Normal);
+	}
 
 	const float AtlasSize = 4.0f;
 	const float TileSize = 1.0f / AtlasSize;
+	float TileIndex = GetTileIndex(Type);
+	int TileX = FMath::FloorToInt(TileIndex) % static_cast<int>(AtlasSize);
+	int TileY = FMath::FloorToInt(TileIndex) / static_cast<int>(AtlasSize);
+	float BaseU = TileX * TileSize;
+	float BaseV = TileY * TileSize;
 
-	float tileIndex = GetTileIndex(Type);
-	int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
-	int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
-
-	float baseU = tileX * TileSize;
-	float baseV = tileY * TileSize;
-
-	Tailing(baseU,baseV,w,h,bPositive);   
-}
-
-void FGreedyMeshing::Tailing(float baseU, float baseV, int w,int h, bool bPositive)
-{
-	if (bPositive)
+	switch (Face)
 	{
-		UVs.Add({0, 0});
-		UVs.Add({0, (float)h});
-		UVs.Add({(float)w, (float)h});
-		UVs.Add({(float)w, 0});
+	case EFace::PosY:
+		UVs.Add(FVector2D(0.0f, 0.0f));
+		UVs.Add(FVector2D(static_cast<float>(w), 0.0f));
+		UVs.Add(FVector2D(static_cast<float>(w), static_cast<float>(h)));
+		UVs.Add(FVector2D(0.0f, static_cast<float>(h)));
+		break;
+	case EFace::NegY:
+		UVs.Add(FVector2D(0.0f, 0.0f));
+		UVs.Add(FVector2D(0.0f, static_cast<float>(h)));
+		UVs.Add(FVector2D(static_cast<float>(w), static_cast<float>(h)));
+		UVs.Add(FVector2D(static_cast<float>(w), 0.0f));
+		break;
+	case EFace::NegX:
+	case EFace::NegZ:
+		UVs.Add(FVector2D(static_cast<float>(w), 0.0f));
+		UVs.Add(FVector2D(0.0f, 0.0f));
+		UVs.Add(FVector2D(0.0f, static_cast<float>(h)));
+		UVs.Add(FVector2D(static_cast<float>(w), static_cast<float>(h)));
+		break;
+	default:
+		UVs.Add(FVector2D(0.0f, 0.0f));
+		UVs.Add(FVector2D(0.0f, static_cast<float>(h)));
+		UVs.Add(FVector2D(static_cast<float>(w), static_cast<float>(h)));
+		UVs.Add(FVector2D(static_cast<float>(w), 0.0f));
+		break;
 	}
-	else
-	{
-		UVs.Add({(float)w, 0});
-		UVs.Add({0, 0});
-		UVs.Add({0, (float)h});
-		UVs.Add({(float)w, (float)h});
-	}
-
 
 	for (int i = 0; i < 4; i++)
-		UV1s.Add(FVector2D(baseU, baseV ));
-}
-
-void FGreedyMeshing::GreedyYPos(bool bPositive)
-{
-    int dy = bPositive ? 1 : -1;
-
-    std::vector<std::vector<FMaskCell>> Mask(CHUNK_X_SIZE, std::vector<FMaskCell>(CHUNK_Z_SIZE));
-
-    for (int y = 0; y < CHUNK_X_SIZE; y++)
-    {
-        for (int x = 0; x < CHUNK_X_SIZE; x++)
-            for (int z = 0; z < CHUNK_Z_SIZE; z++)
-                Mask[x][z].bValid = false;
-
-        for (int x = 0; x < CHUNK_X_SIZE; x++)
-        {
-            for (int z = 0; z < CHUNK_Z_SIZE; z++)
-            {
-                if (IsFaceVisible(x, y, z, 0, dy, 0))
-                {
-                    Mask[x][z].bValid = true;
-                    Mask[x][z].Type =  Chunk->GetBlock(x,y,z);
-                }
-            }
-        }
-
-        for (int x = 0; x < CHUNK_X_SIZE; x++)
-        {
-            for (int z = 0; z < CHUNK_Z_SIZE; z++)
-            {
-                if (!Mask[x][z].bValid)
-                    continue;
-
-                BlockType CurrentType = Mask[x][z].Type;
-
-                int width = 1;
-                while (x + width < CHUNK_X_SIZE &&
-                       Mask[x + width][z].bValid &&
-                       Mask[x + width][z].Type == CurrentType)
-                {
-                    width++;
-                }
-
-                int height = 1;
-                bool done = false;
-                while (z + height < CHUNK_Z_SIZE && !done)
-                {
-                    for (int i = 0; i < width; i++)
-                    {
-                        if (!Mask[x + i][z + height].bValid ||
-                            Mask[x + i][z + height].Type != CurrentType)
-                        {
-                            done = true;
-                            break;
-                        }
-                    }
-                    if (!done) height++;
-                }
-
-                AddQuadY(x, y, z, width, height, bPositive, CurrentType);
-
-                for (int dx = 0; dx < width; dx++)
-                {
-                    for (int dz = 0; dz < height; dz++)
-                    {
-                        Mask[x + dx][z + dz].bValid = false;
-                    }
-                }
-            }
-        }
-    }
-}
-void FGreedyMeshing::AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type)
-{   
-    float yCoord;
-    FVector Normal;
-    
-    if (bPositive)
-    {
-        yCoord = (y + 1) * BLOCK_SIZE;
-        Normal = FVector(0, 1, 0);
-    }
-    else
-    {
-        yCoord = y * BLOCK_SIZE;
-        Normal = FVector(0, -1, 0);
-    }
-    
-    float baseX = x * BLOCK_SIZE;
-    float baseZ = z * BLOCK_SIZE;
-    
-    float quadWidth = w * BLOCK_SIZE;  
-    float quadHeight = h * BLOCK_SIZE; 
-    
-    int start = Vertices.Num();
-
-    if (bPositive)
-    {
-        Vertices.Add(FVector(baseX, yCoord, baseZ));                    
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));       
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); 
-        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));
-        Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
-    }
-    else
-    {
-        // Y- грань
-        Vertices.Add(FVector(baseX, yCoord, baseZ));                     
-        Vertices.Add(FVector(baseX, yCoord, baseZ + quadHeight));        
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ + quadHeight)); 
-        Vertices.Add(FVector(baseX + quadWidth, yCoord, baseZ));        
-        
-        Triangles.Append({ start, start+1, start+2, start, start+2, start+3 });
-    }
-    
-    for (int i = 0; i < 4; i++)
-    {
-        Normals.Add(Normal);
-    }
-    
-    const float AtlasSize = 4.0f;
-    const float TileSize = 1.0f / AtlasSize;
-
-    float tileIndex = GetTileIndex(Type);
-    int tileX = FMath::FloorToInt(tileIndex) % (int)AtlasSize;
-    int tileY = FMath::FloorToInt(tileIndex) / (int)AtlasSize;
-
-    float baseU = tileX * TileSize;
-    float baseV = tileY * TileSize;
-
-    if (bPositive)
-    {
-        UVs.Add(FVector2D(0.0f, 0.0f));          
-        UVs.Add(FVector2D((float)w, 0.0f));      
-        UVs.Add(FVector2D((float)w, (float)h));   
-        UVs.Add(FVector2D(0.0f, (float)h));       
-    }
-    else
-    {
-        UVs.Add(FVector2D(0.0f, 0.0f));          
-        UVs.Add(FVector2D(0.0f, (float)h));      
-        UVs.Add(FVector2D((float)w, (float)h));  
-        UVs.Add(FVector2D((float)w, 0.0f));      
-    }
-
-    for (int i = 0; i < 4; i++)
-        UV1s.Add(FVector2D(baseU, baseV));   
- 
+	{
+		UV1s.Add(FVector2D(BaseU, BaseV));
+	}
 }
 
 FVector FGreedyMeshing::CreateMesh(UMinecraftProceduralMeshComponent& procMesh,UMaterialInterface* Mat)

@@ -36,18 +36,13 @@ private:
 	bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz);
 	bool IsAir(int x, int y, int z);
 	float GetTileIndex(BlockType Type);
-	void GreedyZPos(bool bPositive);
-	void AddQuadZ(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
-	void GreedyXPos(bool bPositive);
-	void AddQuadX(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
-	void Tailing(float baseU, float baseV, int w, int h, bool bPositive);
-	void GreedyYPos(bool bPositive);
+	void GreedyFace(EFace Face);
+	void AddQuad(EFace Face, int x, int y, int z, int w, int h, BlockType Type);
 	const FChunkBuildData* Chunk=nullptr;
 public:
 	void Clear();
 	void BuildGreedyMesh(const FChunkBuildData* Data);
 	void BuildMesh(const FChunkBuildData& Data);
-	void AddQuadY(int x, int y, int z, int w, int h, bool bPositive, BlockType Type);
 public:
 	FVector CreateMesh(UMinecraftProceduralMeshComponent& procMesh, UMaterialInterface* Mat);
 	
