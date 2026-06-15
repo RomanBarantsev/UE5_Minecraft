@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "FChunkBuildData.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "ChunkWorldSubsystem.generated.h"
+#include "ChunkManagerSubsystem.generated.h"
 
 class UMinecraftProceduralMeshComponent;
 class FGreedyMeshing;
@@ -14,7 +14,7 @@ class AChunkGenerator;
  * 
  */
 UCLASS()
-class MINECRAFT_API UChunkWorldSubsystem : public UWorldSubsystem
+class MINECRAFT_API UChunkManagerSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 	
@@ -28,7 +28,7 @@ class MINECRAFT_API UChunkWorldSubsystem : public UWorldSubsystem
 	UPROPERTY()
 	AChunkGenerator* ChunkGenerator = nullptr;
 	const int chunkDeep=8;
-	size_t OperationPerTick=1;
+	size_t OperationPerTick=3;
 	float EPS = 0.1f;	
 	
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
