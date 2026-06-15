@@ -1,7 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "ChunkWorldSubsystem.h"
+#include "ChunkManagerSubsystem.h"
 
 #include "ChunkGenerator.h"
 #include "GreedyMeshing.h"
@@ -9,7 +9,7 @@
 #include "MinecraftProceduralMeshComponent.h"
 #include "MinecrafteDataBaseSettings.h"
 
-void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+void UChunkManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	const UMinecraftDataBaseSettings* Settings = GetDefault<UMinecraftDataBaseSettings>();
@@ -31,10 +31,10 @@ void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	USceneComponent* RootComponent = NewObject<USceneComponent>(ChunksContainer, TEXT("Root"));
 	RootComponent->RegisterComponent();
 	ChunksContainer->SetRootComponent(RootComponent);
-	GetWorld()->GetTimerManager().SetTimer(	ChunkUpdateTimer,this,&UChunkWorldSubsystem::Tick,0.2f,true);
+	GetWorld()->GetTimerManager().SetTimer(	ChunkUpdateTimer,this,&UChunkManagerSubsystem::Tick,0.2f,true);
 }
 
-void UChunkWorldSubsystem::Deinitialize()
+void UChunkManagerSubsystem::Deinitialize()
 {
 	if (UWorld* World = GetWorld())
 	{
@@ -44,12 +44,12 @@ void UChunkWorldSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UChunkWorldSubsystem::SetChunkGenerator(AChunkGenerator* InChunkGenerator)
+void UChunkManagerSubsystem::SetChunkGenerator(AChunkGenerator* InChunkGenerator)
 {
 	ChunkGenerator = InChunkGenerator;
 }
 
-void UChunkWorldSubsystem::UpdateChunks(FVector coord)
+void UChunkManagerSubsystem::UpdateChunks(FVector coord)
 {
 	if (!ChunksForRemote.IsEmpty())
 	{
@@ -104,7 +104,7 @@ void UChunkWorldSubsystem::UpdateChunks(FVector coord)
 	}
 }
 
-void UChunkWorldSubsystem::RemoveChunk(FChunkCoord coord)
+void UChunkManagerSubsystem::RemoveChunk(FChunkCoord coord)
 {
 	if (MeshesMap.Contains(coord))
 	{
@@ -116,7 +116,7 @@ void UChunkWorldSubsystem::RemoveChunk(FChunkCoord coord)
 	}	
 }
 
-void UChunkWorldSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing)
+void UChunkManagerSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing)
 {
 	UMinecraftProceduralMeshComponent* ProcMesh;
 	if (FreeProcMeshes.IsEmpty())
@@ -140,7 +140,7 @@ void UChunkWorldSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& 
 	}
 }
 
-void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateArray)
+void UChunkManagerSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateArray)
 {
 	if (GenerateArray.IsEmpty() || !ChunkGenerator)
 	{
@@ -150,7 +150,7 @@ void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateA
 	TArray<FAsyncGenerationResult> Results;
 	Results.SetNum(GenerateArray.Num());
 	
-	TWeakObjectPtr<UChunkWorldSubsystem> WeakSubsystem = this;
+	TWeakObjectPtr<UChunkManagerSubsystem> WeakSubsystem = this;
 	TWeakObjectPtr<AChunkGenerator> WeakGenerator = ChunkGenerator;
 	TArray<FAsyncGenerationResult>* ResultsPtr = new TArray<FAsyncGenerationResult>(Results);
 	Async(EAsyncExecution::ThreadPool,[WeakSubsystem,WeakGenerator,GenerateArray,ResultsPtr]()
@@ -187,7 +187,7 @@ void UChunkWorldSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& GenerateA
 	});
 }
 
-void UChunkWorldSubsystem::Tick()
+void UChunkManagerSubsystem::Tick()
 {
 	if (CoordsToGenerate.IsEmpty() || !ChunkGenerator)
 		return;	
@@ -210,7 +210,7 @@ void UChunkWorldSubsystem::Tick()
 	AsyncChunkCreate(GenerateArray);	
 }
 
-void UChunkWorldSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
+void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
 {
 	FVector CorrectWorldPos =Hit.ImpactPoint - Hit.ImpactNormal * EPS;
 	FVector LocalPos =mesh->GetComponentTransform().InverseTransformPosition(CorrectWorldPos);

@@ -2,7 +2,7 @@
 
 
 #include "ChunkGenerator.h"
-#include "Minecraft/ChunkWorldSubsystem.h"
+#include "Minecraft/ChunkManagerSubsystem.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Minecraft/BiomDataAsset.h"
 #include "Minecraft/FastNoiseLite.h"
@@ -34,7 +34,7 @@ void AChunkGenerator::BeginPlay()
 	LoadAllBioms();
 	InitializeBiomeMap();
 
-	if (UChunkWorldSubsystem* ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkWorldSubsystem>())
+	if (UChunkManagerSubsystem* ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkManagerSubsystem>())
 	{
 		ChunkWorldSubsystem->SetChunkGenerator(this);
 		ChunkWorldSubsystem->UpdateChunks(FVector::ZeroVector);

@@ -6,7 +6,7 @@
 #include "GameFramework/DefaultPawn.h"
 #include "MC_Pawn.generated.h"
 
-class UChunkWorldSubsystem;
+class UChunkManagerSubsystem;
 class FGreedyMeshing;
 
 UCLASS()
@@ -28,7 +28,7 @@ protected:
 public:
 	void Fire();
 	UPROPERTY()
-	UChunkWorldSubsystem* ChunkWorldSubsystem;
+	UChunkManagerSubsystem* ChunkWorldSubsystem;
 	UFUNCTION()
 	FVector GetPlayerVoxelPos();
 	// Called to bind functionality to input

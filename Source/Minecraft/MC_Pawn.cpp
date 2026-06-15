@@ -3,7 +3,7 @@
 
 #include "MC_Pawn.h"
 
-#include "ChunkWorldSubsystem.h"
+#include "ChunkManagerSubsystem.h"
 #include "FChunkBuildData.h"
 #include "MinecraftProceduralMeshComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
@@ -28,7 +28,7 @@ void AMC_Pawn::BeginPlay()
 		Move->Acceleration = 12000.f;   
 		Move->Deceleration = 12000.f;
 	}
-	ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkWorldSubsystem>();
+	ChunkWorldSubsystem = GetWorld()->GetSubsystem<UChunkManagerSubsystem>();
 	if (!ChunkWorldSubsystem)
 	{
 		UE_LOG(LogTemp,Error,TEXT("ChunkWorldSubsystem is nullptr"));
