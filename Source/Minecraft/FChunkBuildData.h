@@ -6,7 +6,6 @@ struct FChunkCoord
 {
 	int x;
 	int y;
-	bool startPos=true;
 	bool operator==(const FChunkCoord& rhs) const
 	{
 		return x == rhs.x && y == rhs.y;
@@ -71,7 +70,7 @@ struct FChunkBuildData
 private:
 	std::vector<uint8> Blocks;
 	std::vector<uint8> SurfaceHeights;
-	
+
 public:
 	FChunkCoord ChunkCoord;
 	FChunkBuildData();

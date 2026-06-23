@@ -44,6 +44,14 @@ void UChunkManagerSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
+FChunkCoord UChunkManagerSubsystem::GetChunkCoordFromVectorPos(FVector pos)
+{
+	FChunkCoord chunkCoord;
+	chunkCoord.x = FMath::FloorToInt(pos.X/CHUNK_X_SIZE);
+	chunkCoord.y = FMath::FloorToInt(pos.Y/CHUNK_Y_SIZE);
+	return chunkCoord;
+}
+
 void UChunkManagerSubsystem::SetChunkGenerator(AChunkGenerator* InChunkGenerator)
 {
 	ChunkGenerator = InChunkGenerator;
@@ -51,56 +59,51 @@ void UChunkManagerSubsystem::SetChunkGenerator(AChunkGenerator* InChunkGenerator
 
 void UChunkManagerSubsystem::UpdateChunks(FVector coord)
 {
-	if (!ChunksForRemote.IsEmpty())
-	{
-		int RemovedCount = 0;
-		for (auto It = ChunksForRemote.CreateIterator(); It && RemovedCount < OperationPerTick; ++It, ++RemovedCount)
-		{
-			RemoveChunk(It.Key());
-			It.RemoveCurrent();
-		}
-		return;
-	}
 	coord/=BLOCK_SIZE;
-	FChunkCoord chunkCoord;
-	chunkCoord.x = FMath::FloorToInt(coord.X/CHUNK_X_SIZE);
-	chunkCoord.y = FMath::FloorToInt(coord.Y/CHUNK_Y_SIZE);
-		
-	if (FMath::Abs(currentChunkPosition.x - chunkCoord.x) > chunkDeep/2
-	 || FMath::Abs(currentChunkPosition.y - chunkCoord.y) > chunkDeep/2
-											|| currentChunkPosition.startPos)
-	{
-		currentChunkPosition.startPos=false;
+	FChunkCoord chunkCoord = GetChunkCoordFromVectorPos(coord);
+	if (!bHasCurrentChunkPosition ||
+		FMath::Abs(currentChunkPosition.x - chunkCoord.x) >= chunkGenerationBorder ||
+		FMath::Abs(currentChunkPosition.y - chunkCoord.y) >= chunkGenerationBorder )
+	{ //we are in new square
 		currentChunkPosition.x = FMath::FloorToInt((float)chunkCoord.x / chunkDeep) * chunkDeep;
 		currentChunkPosition.y = FMath::FloorToInt((float)chunkCoord.y / chunkDeep) * chunkDeep;
 		UE_LOG(LogTemp, Warning, TEXT("currentChunkPosition x %d y %d"),currentChunkPosition.x,currentChunkPosition.y);
-		for (auto& ChunkPair : Chunks)
-		{
-			if (!ChunksForRemote.Contains(ChunkPair.Key))
-			{
-				ChunksForRemote.Add(ChunkPair.Key, ChunkPair.Value);
-			}
-		}
-		Chunks.Empty();				
-		
+		currentChunkPosition=chunkCoord;
+		bHasCurrentChunkPosition = true;
+		//new coordinate to generate
 		for (int x  = chunkCoord.x-chunkDeep; x < chunkCoord.x+chunkDeep; ++x)
 		{
 			for (int y = chunkCoord.y-chunkDeep; y < chunkCoord.y+chunkDeep; ++y)
 			{
 				FChunkCoord newCoord{x,y};
-				int weight = FMath::Max(FMath::Abs(chunkCoord.x-x),FMath::Abs(chunkCoord.y-y));
-				if (!ChunksForRemote.Contains(newCoord))
-				{
-					CoordsToGenerate.Add(weight,newCoord);				
-					Chunks.Add(newCoord,nullptr);
-				}
-				else
-				{
-					Chunks.Add(newCoord,ChunksForRemote[newCoord]);
-					ChunksForRemote.Remove(newCoord);
-				}				
+				ChunksDesiredCoord.Add(newCoord);
 			}
-		}	
+		}
+		//coordinate to remove
+		for (auto ChunkCurrent : ChunksCurrentCoord)
+		{
+			if (!ChunksDesiredCoord.Contains(ChunkCurrent))
+			{
+				ChunksForRemoveCoord.Add(ChunkCurrent);
+			}
+		}
+		//weight for generation
+		for (const auto Chunk : ChunksDesiredCoord)
+		{
+			if (!ChunksCurrentCoord.Contains(Chunk))
+			{
+				int Weight = FMath::Max(FMath::Abs(chunkCoord.x-Chunk.x),FMath::Abs(chunkCoord.y-Chunk.y));
+				CoordsToGenerate.Add(Weight,Chunk);
+				ChunksBuildData.Add(Chunk,nullptr);
+			}
+		}
+		ChunksCurrentCoord=ChunksDesiredCoord;
+		for (auto& Chunk : ChunksForRemoveCoord)
+		{
+			RemoveChunk(Chunk);
+		}
+		ChunksDesiredCoord.Empty();
+		ChunksForRemoveCoord.Empty();
 	}
 }
 
@@ -113,11 +116,12 @@ void UChunkManagerSubsystem::RemoveChunk(FChunkCoord coord)
 		MeshesMap.Remove(coord);
 		FreeProcMeshes.Add(Mesh);
 		MeshToChunkMap.Remove(Mesh);
-	}	
+	}
 }
 
 void UChunkManagerSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing)
 {
+	//proc mesh gets from the pool or creates a new one
 	UMinecraftProceduralMeshComponent* ProcMesh;
 	if (FreeProcMeshes.IsEmpty())
 	{
@@ -129,14 +133,16 @@ void UChunkManagerSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing
 	}
 	else
 	{
-		ProcMesh = FreeProcMeshes.Pop();		
+		ProcMesh = FreeProcMeshes.Pop();
 	}
 	ProcMesh->SetRelativeLocation(FVector(Data.ChunkCoord.x*CHUNK_X_SIZE*BLOCK_SIZE, Data.ChunkCoord.y*CHUNK_Y_SIZE*BLOCK_SIZE, 0));
+
+	//send proc mesh to greedy mesh for assembly chunk
 	GreedyMeshing.CreateMesh(*ProcMesh,BlocksMatertial);
 	MeshesMap.Add(Data.ChunkCoord,ProcMesh);
-	if (Chunks.Contains(Data.ChunkCoord))
+	if (ChunksBuildData.Contains(Data.ChunkCoord))
 	{
-		MeshToChunkMap.Add(ProcMesh, Chunks[Data.ChunkCoord].Get());
+		MeshToChunkMap.Add(ProcMesh, ChunksBuildData[Data.ChunkCoord].Get());
 	}
 }
 
@@ -146,10 +152,10 @@ void UChunkManagerSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& Generat
 	{
 		return;
 	}
-	
+
 	TArray<FAsyncGenerationResult> Results;
 	Results.SetNum(GenerateArray.Num());
-	
+
 	TWeakObjectPtr<UChunkManagerSubsystem> WeakSubsystem = this;
 	TWeakObjectPtr<AChunkGenerator> WeakGenerator = ChunkGenerator;
 	TArray<FAsyncGenerationResult>* ResultsPtr = new TArray<FAsyncGenerationResult>(Results);
@@ -160,12 +166,12 @@ void UChunkManagerSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& Generat
 			if (!WeakGenerator.IsValid())
 				return;
 			FChunkCoord CurrentCoord = GenerateArray[i];
-			
+
 			TSharedPtr<FChunkBuildData> Data = MakeShared<FChunkBuildData>();
 			Data->ChunkCoord = CurrentCoord;
-			
+
 			WeakGenerator->GenerateChunkData(*Data);
-			
+
 			auto Mesher = MakeShared<FGreedyMeshing>();
 			Mesher->BuildGreedyMesh(Data.Get());
 			(*ResultsPtr)[i] = {CurrentCoord,Data,Mesher};
@@ -174,11 +180,11 @@ void UChunkManagerSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& Generat
 		if (WeakSubsystem.IsValid()) {
 			for (const auto& Res : *ResultsPtr) {
 				if (Res.BuildData.IsValid()) {
-					if (WeakSubsystem->Chunks.Contains(Res.Coord))
+					if (WeakSubsystem->ChunksBuildData.Contains(Res.Coord))
 					{
-						WeakSubsystem->Chunks[Res.Coord] = Res.BuildData;
+						WeakSubsystem->ChunksBuildData[Res.Coord] = Res.BuildData;
 						WeakSubsystem->FinalizeChunk(*Res.BuildData, *Res.GreedyMeshing);
-					}					
+					}
 				}
 			}
 		}
@@ -190,7 +196,7 @@ void UChunkManagerSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& Generat
 void UChunkManagerSubsystem::Tick()
 {
 	if (CoordsToGenerate.IsEmpty() || !ChunkGenerator)
-		return;	
+		return;
 	TArray<FChunkCoord> GenerateArray;
 	for (int i = 0; i < OperationPerTick; i++)
 	{
@@ -203,11 +209,11 @@ void UChunkManagerSubsystem::Tick()
 				It.RemoveCurrent();
 				GenerateArray.Push(OutCoord);
 				break;
-			}		
-			
-		}	
+			}
+
+		}
 	}
-	AsyncChunkCreate(GenerateArray);	
+	AsyncChunkCreate(GenerateArray);
 }
 
 void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMeshComponent* mesh)
@@ -218,7 +224,7 @@ void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMes
 	int Y = FMath::FloorToInt(LocalPos.Y / BLOCK_SIZE);
 	int Z = FMath::FloorToInt(LocalPos.Z / BLOCK_SIZE);
 	LocalPos/=BLOCK_SIZE;
-	
+
 	FChunkCoord chunkCoord;
 	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X_SIZE);
 	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y_SIZE);
@@ -232,8 +238,8 @@ void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMes
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
-	mesh->bUseAsyncCooking = true; 
-	FGreedyMeshing GreedyMeshing;	
+	mesh->bUseAsyncCooking = true;
+	FGreedyMeshing GreedyMeshing;
 	GreedyMeshing.BuildGreedyMesh(Chunk);
 	GreedyMeshing.CreateMesh(*mesh,BlocksMatertial);
 	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
