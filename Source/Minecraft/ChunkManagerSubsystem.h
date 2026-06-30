@@ -55,7 +55,7 @@ class MINECRAFT_API UChunkManagerSubsystem : public UWorldSubsystem
 
 	UPROPERTY()
 	TArray<UMinecraftProceduralMeshComponent*> FreeProcMeshes;
-	TMap<UMinecraftProceduralMeshComponent*,FChunkBuildData*> MeshToChunkMap;
+	TMap<UMinecraftProceduralMeshComponent*,TSharedPtr<FChunkBuildData>> MeshToChunkMap;
 	TMultiMap<int32,FChunkCoord> CoordsToGenerate;
 
 	FChunkCoord currentChunkPosition;

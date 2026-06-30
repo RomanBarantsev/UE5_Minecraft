@@ -129,7 +129,7 @@ void UChunkManagerSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing
 		ProcMesh->RegisterComponent();
 		ProcMesh->AttachToComponent(ChunksContainer->GetRootComponent(),FAttachmentTransformRules::KeepRelativeTransform);
 		ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		ProcMesh->bUseAsyncCooking = true;
+		ProcMesh->bUseAsyncCooking = true; //TODO for far chunk don't do collision
 	}
 	else
 	{
@@ -142,7 +142,7 @@ void UChunkManagerSubsystem::FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing
 	MeshesMap.Add(Data.ChunkCoord,ProcMesh);
 	if (ChunksBuildData.Contains(Data.ChunkCoord))
 	{
-		MeshToChunkMap.Add(ProcMesh, ChunksBuildData[Data.ChunkCoord].Get());
+		MeshToChunkMap.Add(ProcMesh, ChunksBuildData[Data.ChunkCoord]);
 	}
 }
 
@@ -225,23 +225,41 @@ void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMes
 	int Z = FMath::FloorToInt(LocalPos.Z / BLOCK_SIZE);
 	LocalPos/=BLOCK_SIZE;
 
-	FChunkCoord chunkCoord;
-	chunkCoord.x = FMath::FloorToInt(LocalPos.X/CHUNK_X_SIZE);
-	chunkCoord.y = FMath::FloorToInt(LocalPos.Y/CHUNK_Y_SIZE);
 	if (!MeshToChunkMap.Contains(mesh))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Mesh not found in MeshToChunkMap"));
 		return;
 	}
-	auto Chunk = MeshToChunkMap[mesh];
+	TSharedPtr<FChunkBuildData> Chunk = MeshToChunkMap[mesh];
+	if (!Chunk.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Chunk data is invalid"));
+		return;
+	}
 
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->ClearAllMeshSections();
 	mesh->bUseAsyncCooking = true;
-	FGreedyMeshing GreedyMeshing;
-	GreedyMeshing.BuildGreedyMesh(Chunk);
-	GreedyMeshing.CreateMesh(*mesh,BlocksMatertial);
+
+	TWeakObjectPtr<UMinecraftProceduralMeshComponent> WeakMesh = mesh;
+	TWeakObjectPtr<UChunkManagerSubsystem> WeakSubsystem = this;
+	Async(EAsyncExecution::ThreadPool,[WeakSubsystem, WeakMesh, Chunk]()
+	{
+		TSharedPtr<FGreedyMeshing> GreedyMeshing = MakeShared<FGreedyMeshing>();
+		GreedyMeshing->BuildGreedyMesh(Chunk.Get());
+
+		AsyncTask(ENamedThreads::GameThread, [WeakSubsystem, WeakMesh, GreedyMeshing]()
+		{
+			if (!WeakSubsystem.IsValid() || !WeakMesh.IsValid())
+			{
+				return;
+			}
+
+			GreedyMeshing->CreateMesh(*WeakMesh.Get(), WeakSubsystem->BlocksMatertial);
+		});
+	});
+
 	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	FActorSpawnParameters spawnParams;
 	//TODO make a pool
