@@ -239,7 +239,6 @@ void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMes
 
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
-	mesh->ClearAllMeshSections();
 	mesh->bUseAsyncCooking = true;
 
 	TWeakObjectPtr<UMinecraftProceduralMeshComponent> WeakMesh = mesh;
