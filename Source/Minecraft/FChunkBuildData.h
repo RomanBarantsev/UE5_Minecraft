@@ -53,8 +53,8 @@ constexpr int BLOCK_SIZE = 256;
 constexpr int BEDROCK_BASE = 0;
 constexpr int BEDROCK_HEIGHT = 5;
 
-constexpr int CHUNK_X_SIZE = 64;
-constexpr int CHUNK_Y_SIZE = 64;
+constexpr int CHUNK_X_SIZE = 16;
+constexpr int CHUNK_Y_SIZE = 16;
 constexpr int CHUNK_Z_SIZE = 256;
 constexpr uint8_t MIN_HEIGHT = 20;
 constexpr uint8_t MAX_HEIGHT = 96;
