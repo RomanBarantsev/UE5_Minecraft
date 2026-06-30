@@ -42,15 +42,9 @@ class MINECRAFT_API AChunkGenerator : public AActor
 private:
 	const float delimiterChunkHeight=0.05;
 	UPROPERTY()
-	UNoiseManagerSubSystem* NoiseManager;
 	
-public:
-	// Sets default values for this actor's properties
-	AChunkGenerator();
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-	
+	//TODO MAKE STATIC ALL VALUES
+	UNoiseManagerSubSystem* NoiseManager; 
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ContinentalnessCurve;
 	UPROPERTY(EditAnywhere)
@@ -63,6 +57,13 @@ protected:
 	UPROPERTY()
 	TArray<FBiomLUTMap> BiomesLUTArray;	
 	const int BiomesArraySize = 40000;
+	
+public:
+	// Sets default values for this actor's properties
+	AChunkGenerator();
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;	
 	
 FBiomLUTMap& GetLUTData(float T, float H) 
 	{
