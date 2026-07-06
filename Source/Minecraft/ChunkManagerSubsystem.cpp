@@ -116,6 +116,7 @@ void UChunkManagerSubsystem::RemoveChunk(FChunkCoord coord)
 		MeshesMap.Remove(coord);
 		FreeProcMeshes.Add(Mesh);
 		MeshToChunkMap.Remove(Mesh);
+		ChunkRebuildStates.Remove(Mesh);
 	}
 }
 
@@ -193,6 +194,76 @@ void UChunkManagerSubsystem::AsyncChunkCreate(const TArray<FChunkCoord>& Generat
 	});
 }
 
+void UChunkManagerSubsystem::RequestChunkRebuild(UMinecraftProceduralMeshComponent* Mesh, TSharedPtr<FChunkBuildData> Chunk)
+{
+	if (!Mesh || !Chunk.IsValid())
+	{
+		return;
+	}
+
+	FChunkRebuildState& State = ChunkRebuildStates.FindOrAdd(Mesh);
+	State.Version++;
+
+	if (State.bRebuildInProgress)
+	{
+		State.bRebuildRequested = true;
+		return;
+	}
+
+	StartChunkRebuild(Mesh, Chunk, State.Version);
+}
+
+void UChunkManagerSubsystem::StartChunkRebuild(UMinecraftProceduralMeshComponent* Mesh, TSharedPtr<FChunkBuildData> Chunk, int32 Version)
+{
+	if (!Mesh || !Chunk.IsValid())
+	{
+		return;
+	}
+
+	FChunkRebuildState& State = ChunkRebuildStates.FindOrAdd(Mesh);
+	State.bRebuildInProgress = true;
+	State.bRebuildRequested = false;
+
+	TWeakObjectPtr<UMinecraftProceduralMeshComponent> WeakMesh = Mesh;
+	TWeakObjectPtr<UChunkManagerSubsystem> WeakSubsystem = this;
+	TSharedPtr<FChunkBuildData> ChunkSnapshot = MakeShared<FChunkBuildData>(*Chunk);
+
+	Async(EAsyncExecution::ThreadPool,[WeakSubsystem, WeakMesh, Chunk, ChunkSnapshot, Version]()
+	{
+		TSharedPtr<FGreedyMeshing> GreedyMeshing = MakeShared<FGreedyMeshing>();
+		GreedyMeshing->BuildGreedyMesh(ChunkSnapshot.Get());
+
+		AsyncTask(ENamedThreads::GameThread, [WeakSubsystem, WeakMesh, Chunk, GreedyMeshing, Version]()
+		{
+			if (!WeakSubsystem.IsValid() || !WeakMesh.IsValid())
+			{
+				return;
+			}
+
+			UChunkManagerSubsystem* Subsystem = WeakSubsystem.Get();
+			UMinecraftProceduralMeshComponent* Mesh = WeakMesh.Get();
+			TSharedPtr<FChunkBuildData>* CurrentChunk = Subsystem->MeshToChunkMap.Find(Mesh);
+			FChunkRebuildState* State = Subsystem->ChunkRebuildStates.Find(Mesh);
+			if (!CurrentChunk || *CurrentChunk != Chunk || !State)
+			{
+				return;
+			}
+
+			if (State->Version == Version)
+			{
+				GreedyMeshing->CreateMesh(*Mesh, Subsystem->BlocksMatertial);
+			}
+
+			State->bRebuildInProgress = false;
+
+			if (State->bRebuildRequested)
+			{
+				Subsystem->StartChunkRebuild(Mesh, Chunk, State->Version);
+			}
+		});
+	});
+}
+
 void UChunkManagerSubsystem::Tick()
 {
 	if (CoordsToGenerate.IsEmpty() || !ChunkGenerator)
@@ -240,24 +311,7 @@ void UChunkManagerSubsystem::RemoveBlock(FHitResult Hit, UMinecraftProceduralMes
 	BlockType CurrentBlockType = Chunk->GetBlock(X,Y,Z);
 	Chunk->SetBlock(X,Y,Z,BlockType::Air);
 	mesh->bUseAsyncCooking = true;
-
-	TWeakObjectPtr<UMinecraftProceduralMeshComponent> WeakMesh = mesh;
-	TWeakObjectPtr<UChunkManagerSubsystem> WeakSubsystem = this;
-	Async(EAsyncExecution::ThreadPool,[WeakSubsystem, WeakMesh, Chunk]()
-	{
-		TSharedPtr<FGreedyMeshing> GreedyMeshing = MakeShared<FGreedyMeshing>();
-		GreedyMeshing->BuildGreedyMesh(Chunk.Get());
-
-		AsyncTask(ENamedThreads::GameThread, [WeakSubsystem, WeakMesh, GreedyMeshing]()
-		{
-			if (!WeakSubsystem.IsValid() || !WeakMesh.IsValid())
-			{
-				return;
-			}
-
-			GreedyMeshing->CreateMesh(*WeakMesh.Get(), WeakSubsystem->BlocksMatertial);
-		});
-	});
+	RequestChunkRebuild(mesh, Chunk);
 
 	FVector CubeLocation = FVector(mesh->GetComponentLocation().X+X*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Y+Y*BLOCK_SIZE+BLOCK_SIZE/2,mesh->GetComponentLocation().Z+Z*BLOCK_SIZE+BLOCK_SIZE/2);
 	FActorSpawnParameters spawnParams;

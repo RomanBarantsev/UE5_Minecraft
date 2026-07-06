@@ -23,6 +23,11 @@ class MINECRAFT_API UChunkManagerSubsystem : public UWorldSubsystem
 		TSharedPtr<FChunkBuildData> BuildData;
 		TSharedPtr<FGreedyMeshing> GreedyMeshing;
 	};
+	struct FChunkRebuildState {
+		int32 Version = 0;
+		bool bRebuildInProgress = false;
+		bool bRebuildRequested = false;
+	};
 	UPROPERTY()
 	AActor* ChunksContainer;
 	UPROPERTY()
@@ -37,6 +42,8 @@ class MINECRAFT_API UChunkManagerSubsystem : public UWorldSubsystem
 	void Tick();
 	void RemoveChunk(FChunkCoord coord);
 	void FinalizeChunk(FChunkBuildData& Data, FGreedyMeshing& GreedyMeshing);
+	void RequestChunkRebuild(UMinecraftProceduralMeshComponent* Mesh, TSharedPtr<FChunkBuildData> Chunk);
+	void StartChunkRebuild(UMinecraftProceduralMeshComponent* Mesh, TSharedPtr<FChunkBuildData> Chunk, int32 Version);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Material", meta=(AllowPrivateAccess="true"))
 	UMaterialInterface* BlocksMatertial; // TODO get from Menu class
@@ -56,6 +63,7 @@ class MINECRAFT_API UChunkManagerSubsystem : public UWorldSubsystem
 	UPROPERTY()
 	TArray<UMinecraftProceduralMeshComponent*> FreeProcMeshes;
 	TMap<UMinecraftProceduralMeshComponent*,TSharedPtr<FChunkBuildData>> MeshToChunkMap;
+	TMap<UMinecraftProceduralMeshComponent*,FChunkRebuildState> ChunkRebuildStates;
 	TMultiMap<int32,FChunkCoord> CoordsToGenerate;
 
 	FChunkCoord currentChunkPosition;
