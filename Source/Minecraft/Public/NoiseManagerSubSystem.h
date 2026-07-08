@@ -50,6 +50,42 @@ struct FPerlinNoiseBiom : public FTableRowBase
 	float Lacunarity;
 };
 
+USTRUCT(BlueprintType)
+struct FOreGenerationRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	TEnumAsByte<BlockType> OreBlock = BlockType::CoalOre;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	int32 MinZ = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	int32 MaxZ = CHUNK_Z_SIZE - 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	float Scale = 0.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	int32 Octaves = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	float Persistence = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	float Lacunarity = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	float Threshold = 0.72f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	int32 Seed = 1337;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
+	int32 Priority = 0;
+};
+
 struct FFastNoises
 {
 	FastNoiseLite CavesRoomNoise;

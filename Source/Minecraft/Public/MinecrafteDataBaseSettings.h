@@ -16,6 +16,8 @@ class MINECRAFT_API UMinecraftDataBaseSettings : public UDeveloperSettings
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "Noise")
 	FSoftObjectPath PerlinNoiseTablePath;
+	UPROPERTY(Config, EditAnywhere, Category = "Ore")
+	FSoftObjectPath OreGenerationTablePath;
 	UPROPERTY(Config, EditAnywhere, Category = "Material")
 	FSoftObjectPath BlocksMaterial;
 };
