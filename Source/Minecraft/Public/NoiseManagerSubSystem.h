@@ -19,10 +19,10 @@ struct FNoisesParams
 {
 	GENERATED_BODY()
 public:	
-	float Scale;
-	float Octaves;
-	float Persistence;
-	float Lacunarity;
+	float Scale = 0.05f;
+	float Octaves = 3.0f;
+	float Persistence = 0.5f;
+	float Lacunarity = 2.0f;
 	FName rowName;
 };
 
@@ -36,6 +36,14 @@ struct FNoises
 	float Erosion;
 	float Humidity;
 	float Temperature;
+	float CoalOre;
+	float CopperOre;
+	float IronOre;
+	float GoldOre;
+	float RedstoneOre;
+	float LapisOre;
+	float DiamondOre;
+	float EmeraldOre;
 };
 
 USTRUCT()
@@ -98,6 +106,15 @@ struct FFastNoises
 	FastNoiseLite ErosionNoise;
 	FastNoiseLite TemperatureNoise;
 	FastNoiseLite HumidityNoise;
+	
+	FastNoiseLite CoalOreNoise;
+	FastNoiseLite CopperOreNoise;
+	FastNoiseLite IronOreNoise;
+	FastNoiseLite GoldOreNoise;
+	FastNoiseLite RedstoneOreNoise;
+	FastNoiseLite LapisOreNoise;
+	FastNoiseLite DiamondOreNoise;
+	FastNoiseLite EmeraldOreNoise;
 };
 
 UCLASS()
@@ -117,6 +134,15 @@ private:
 	FNoisesParams BedrockParams;
 	FNoisesParams ErosionParams;
 	
+	FNoisesParams CoalOreParams;
+	FNoisesParams CopperOreParams;
+	FNoisesParams IronOreParams;
+	FNoisesParams GoldOreParams;
+	FNoisesParams RedstoneOreParams;
+	FNoisesParams LapisOreParams;
+	FNoisesParams DiamondOreParams;
+	FNoisesParams EmeraldOreParams;
+	
 	TMap<FastNoiseLite*,FText> FastNoises; //for UI	
 	
 	UPROPERTY()
@@ -124,6 +150,7 @@ private:
 	
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;	
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
+	void InitializeNoise(FastNoiseLite& Noise, FNoisesParams& Params, FName RowName, FastNoiseLite::NoiseType NoiseType, float DefaultScale = 0.05f, float DefaultOctaves = 3.0f, float DefaultPersistence = 0.5f, float DefaultLacunarity = 2.0f);
 	void LoadLayers();
 	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
 public:
