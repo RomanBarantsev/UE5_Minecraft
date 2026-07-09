@@ -45,20 +45,15 @@ enum BlockType : uint8
 	Bedrock = 14,
 	IronBlock = 15,
 	GoldBlock = 16,	
-	Count = 17
-};
-
-UENUM()
-enum BlockTypeOre : uint8
-{
-	CoalOre = 0,
-	CopperOre = 1,
-	IronOre = 2,
-	GoldOre = 3,
-	RedstoneOre = 4,
-	LapisOre = 5,
-	DiamondOre = 6,
-	EmeraldOre = 7
+	Count = 17,
+	CoalOre = 18,
+	CopperOre = 19,
+	IronOre = 20,
+	GoldOre = 21,
+	RedstoneOre = 22,
+	LapisOre = 23,
+	DiamondOre = 24,
+	EmeraldOre = 25
 };
 
 constexpr int BLOCK_SIZE = 256;

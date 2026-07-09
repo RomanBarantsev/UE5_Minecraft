@@ -3,9 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GreedyMeshing.h"
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
 #include "Minecraft/FastNoiseLite.h"
+#include "Minecraft/FChunkBuildData.h"
 #include "NoiseManagerSubSystem.generated.h"
 
 /**
@@ -54,7 +56,7 @@ USTRUCT(BlueprintType)
 struct FOreGenerationRow : public FTableRowBase
 {
 	GENERATED_BODY()
-
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
 	TEnumAsByte<BlockType> OreBlock = BlockType::CoalOre;
 
