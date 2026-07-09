@@ -3,10 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "NoiseManagerSubSystem.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Actor.h"
 #include "Minecraft/FChunkBuildData.h"
+#include "NoiseManagerSubSystem.h"
 #include "ChunkGenerator.generated.h"
 
 class UBiomDataAsset;
@@ -93,7 +93,6 @@ private:
 	float GetHeightMask(int z, int minZ, int maxZ);
 	FInterpolatedBiomeData GetInterpolatedLUTData(float T, float H);
 	int CalculateHeight(FNoises noises);
-	void GenerateCaves(FChunkBuildData& Data,int x,int y);
 	void GenerateSurfaceLayer(int z, FNoises& noises, FChunkBuildData& Data, int x, int y);
 	
 	bool bIsGeneratingChunk = false;
