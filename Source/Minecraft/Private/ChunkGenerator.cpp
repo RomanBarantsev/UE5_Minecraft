@@ -203,39 +203,7 @@ void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 			HeightMs += (FPlatformTime::Seconds() - HeightStart) * 1000.0;
 
 			const double BlocksStart = FPlatformTime::Seconds();
-			const float BedrockNoise = bGenerateBiomeBlocks ? FastNoises.BedrockNoise.GetNoise(Fx, Fy) : 0.0f;
-			const int BedrockTop = BEDROCK_BASE + static_cast<int>(((BedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
-
-			for (int z = 0; z < CHUNK_Z_SIZE; ++z)
-			{
-				if (z > Height)
-				{
-					Data.SetBlock(x, y, z, BlockType::Air);
-					continue;
-				}
-
-				if (!bGenerateBiomeBlocks || z == Height)
-				{
-					Data.SetBlock(x, y, z, BlockType::Stone);
-					continue;
-				}
-
-				if (z < BedrockTop || z == 0)
-				{
-					Data.SetBlock(x, y, z, BlockType::Cobblestone);
-					continue;
-				}
-
-				const float Room = FastNoises.CavesRoomNoise.GetNoise(Fx, Fy, static_cast<float>(z));
-				const float Tunnel = FastNoises.CavesTunnelNoise.GetNoise(Fx, Fy, static_cast<float>(z));
-				const float Mask = GetHeightMask(z, 1, Height);
-				float Density =
-					Tunnel * 1.2f + // tunnels are more important
-					Room * 0.8f; // rooms are not so frequently
-				Density *= Mask;
-
-				Data.SetBlock(x, y, z, Density > 0.25f ? BlockType::Air : BlockType::Stone);
-			}
+			GenerateCaveBlock(Data, x, y, Height, Fx, Fy, bGenerateBiomeBlocks);
 			BlocksMs += (FPlatformTime::Seconds() - BlocksStart) * 1000.0;
 
 			if (bGenerateBiomeBlocks)
@@ -253,6 +221,43 @@ void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 		Data.ChunkCoord.x, Data.ChunkCoord.y,
 		HeightMs, (HeightMs / static_cast<double>(TotalCells)),
 		BlocksMs, SurfaceMs, TotalMs);
+}
+
+void AChunkGenerator::GenerateCaveBlock(FChunkBuildData& Data,int x,int y,int SurfaceHeight,float Fx,float Fy,bool bGenerateBiomeBlocks)
+{
+	const float BedrockNoise = bGenerateBiomeBlocks ? FastNoises.BedrockNoise.GetNoise(Fx, Fy) : 0.0f;
+	const int BedrockTop = BEDROCK_BASE + static_cast<int>(((BedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
+
+	for (int z = 0; z < CHUNK_Z_SIZE; ++z)
+	{
+		if (z > SurfaceHeight)
+		{
+			Data.SetBlock(x, y, z, BlockType::Air);
+			continue;
+		}
+
+		if (!bGenerateBiomeBlocks || z == SurfaceHeight)
+		{
+			Data.SetBlock(x, y, z, BlockType::Stone);
+			continue;
+		}
+
+		if (z < BedrockTop || z == 0)
+		{
+			Data.SetBlock(x, y, z, BlockType::Cobblestone);
+			continue;
+		}
+
+		const float Room = FastNoises.CavesRoomNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float Tunnel = FastNoises.CavesTunnelNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float Mask = GetHeightMask(z, 1, SurfaceHeight);
+		float Density =
+			Tunnel * 1.2f + // tunnels are more important
+			Room * 0.8f; // rooms are not so frequently
+		Density *= Mask;
+
+		Data.SetBlock(x, y, z, Density > 0.25f ? BlockType::Air : BlockType::Stone);
+	}
 }
 
 void AChunkGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)
