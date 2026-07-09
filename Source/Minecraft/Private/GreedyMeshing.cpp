@@ -248,7 +248,7 @@ void FGreedyMeshing::AddQuad(EFace Face, int x, int y, int z, int w, int h, Bloc
 		Normals.Add(Config.Normal);
 	}
 
-	const float AtlasSize = 4.0f;
+	const float AtlasSize = 8.0f;
 	const float TileSize = 1.0f / AtlasSize;
 	float TileIndex = GetTileIndex(Type);
 	int TileX = FMath::FloorToInt(TileIndex) % static_cast<int>(AtlasSize);
