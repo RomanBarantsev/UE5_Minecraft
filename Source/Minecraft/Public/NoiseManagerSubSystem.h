@@ -85,15 +85,6 @@ struct FOreGenerationRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
 	float Lacunarity = 2.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	float Threshold = 0.72f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	int32 Seed = 1337;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	int32 Priority = 0;
 };
 
 struct FFastNoises
