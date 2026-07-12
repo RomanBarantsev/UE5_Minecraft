@@ -101,5 +101,4 @@ public:
 	}
 	void SetSurfaceHeight(int x, int y, int height);
 	int GetSurfaceHeight(int x, int y) const;
-	void Fill();
 };
