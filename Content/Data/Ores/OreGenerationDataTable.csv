@@ -1,9 +1,0 @@
-Name,OreBlock,MinZ,MaxZ,Scale,Octaves,Persistence,Lacunarity,Threshold,Seed,Priority
-Coal,CoalOre,8,128,0.085,3,0.5,2.0,0.62,2101,10
-Copper,CopperOre,8,96,0.075,3,0.5,2.0,0.66,2102,20
-Iron,IronOre,4,80,0.07,3,0.5,2.0,0.68,2103,30
-Gold,GoldOre,4,48,0.065,3,0.5,2.0,0.72,2104,40
-Redstone,RedstoneOre,4,32,0.06,3,0.5,2.0,0.74,2105,50
-Lapis,LapisOre,8,48,0.055,3,0.5,2.0,0.76,2106,60
-Diamond,DiamondOre,2,24,0.05,3,0.5,2.0,0.79,2107,70
-Emerald,EmeraldOre,16,64,0.045,3,0.5,2.0,0.81,2108,80
