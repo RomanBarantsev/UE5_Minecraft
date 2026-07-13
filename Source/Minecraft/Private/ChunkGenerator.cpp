@@ -1,8 +1,8 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "AssetRegistry/AssetRegistryModule.h"
 #include "ChunkGenerator.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Minecraft/BiomDataAsset.h"
@@ -158,7 +158,7 @@ FInterpolatedBiomeData AChunkGenerator::GetInterpolatedLUTData(float T, float H)
 	return { FinalScale, FinalOffset };
 }
 
-int AChunkGenerator::CalculateHeight(FNoises noises)
+int AChunkGenerator::CalculateHeight(FNoisesRunTime noises)
 {
 	
 	float BaseHeight = ContinentalnessCurve->GetFloatValue(noises.Continentalness);
@@ -189,7 +189,7 @@ void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 			const int WorldY = Data.ChunkCoord.y * CHUNK_Y_SIZE + y;
 			const float Fx = static_cast<float>(WorldX);
 			const float Fy = static_cast<float>(WorldY);
-			FNoises Noises{};
+			FNoisesRunTime Noises{};
 
 			const double HeightStart = FPlatformTime::Seconds();
 			Noises.PeaksValleys = FastNoises.PeaksValleysNoise.GetNoise(Fx, Fy);
@@ -260,7 +260,25 @@ void AChunkGenerator::GenerateCaveBlock(FChunkBuildData& Data,int x,int y,int Su
 	}
 }
 
-void AChunkGenerator::GenerateSurfaceLayer(int z, FNoises& noises,FChunkBuildData& Data,int x,int y)
+void AChunkGenerator::GenerateOreBlock(FChunkBuildData& Data, int x, int y, int SurfaceHeight, float Fx, float Fy)
+{
+	
+	for (int z = 0; z < CHUNK_Z_SIZE; ++z)
+	{
+		const float CoalNoise = FastNoises.CoalOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float CopperNoise = FastNoises.CopperOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float IronNoise = FastNoises.IronOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float GoldNoise = FastNoises.GoldOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float RedstoneNoise = FastNoises.RedstoneOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float LapisNoise = FastNoises.LapisOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float DiamondNoise = FastNoises.DiamondOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		const float EmeraldNoise = FastNoises.EmeraldOreNoise.GetNoise(Fx, Fy, static_cast<float>(z));
+		
+		
+	}	
+}
+
+void AChunkGenerator::GenerateSurfaceLayer(int z, FNoisesRunTime& noises,FChunkBuildData& Data,int x,int y)
 {	
 	auto LUTData = GetLUTData(noises.Temperature,noises.Humidity);
 	auto BiomeLayers = LUTData.Biome->SurfaceLayers;

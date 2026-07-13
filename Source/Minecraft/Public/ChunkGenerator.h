@@ -51,7 +51,7 @@ private:
 	UCurveFloat* PeaksValleysCurve;
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* ErosionCurve;
-	FFastNoises FastNoises;
+	FFastNoisesTerrain FastNoises;
 	UPROPERTY()
 	TArray<UBiomDataAsset*> BiomesArray;	
 	UPROPERTY()
@@ -92,10 +92,10 @@ private:
 	
 	float GetHeightMask(int z, int minZ, int maxZ);
 	FInterpolatedBiomeData GetInterpolatedLUTData(float T, float H);
-	int CalculateHeight(FNoises noises);
+	int CalculateHeight(FNoisesRunTime noises);
 	void GenerateCaveBlock(FChunkBuildData& Data,int x,int y,int SurfaceHeight,float Fx,float Fy,bool bGenerateBiomeBlocks);
-	void GenerateOreBlock(FChunkBuildData& Data,int x,int y,int SurfaceHeight,float Fx,float Fy,bool bGenerateBiomeBlocks);
-	void GenerateSurfaceLayer(int z, FNoises& noises, FChunkBuildData& Data, int x, int y);
+	void GenerateOreBlock(FChunkBuildData& Data,int x,int y,int SurfaceHeight,float Fx,float Fy);
+	void GenerateSurfaceLayer(int z, FNoisesRunTime& noises, FChunkBuildData& Data, int x, int y);
 	
 	bool bIsGeneratingChunk = false;
 public:

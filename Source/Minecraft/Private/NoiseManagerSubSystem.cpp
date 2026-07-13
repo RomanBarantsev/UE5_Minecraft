@@ -11,11 +11,16 @@ void UNoiseManagerSubSystem::Initialize(FSubsystemCollectionBase& Collection)
 	const UMinecraftDataBaseSettings* Settings = GetDefault<UMinecraftDataBaseSettings>();
 	if (Settings)
 	{
-		PerlinNoiseTable = Cast<UDataTable>(Settings->PerlinNoiseTablePath.TryLoad());;
-		if (!PerlinNoiseTable)
+		TerrainNoiseTablePath = Cast<UDataTable>(Settings->PerlinNoiseTablePath.TryLoad());;
+		if (!TerrainNoiseTablePath)
 			UE_LOG(LogTemp, Warning, TEXT("PerlinNoiseTablePath not found, set it in the Project Settings"));
-	}	
-	
+	}
+	if (Settings)
+	{
+		OreGenerationTablePath = Cast<UDataTable>(Settings->OreGenerationTablePath.TryLoad());;
+		if (!OreGenerationTablePath)
+			UE_LOG(LogTemp, Warning, TEXT("OreGenerationTablePath not found, set it in the Project Settings"));
+	}
 	LoadLayers();	
 	Super::Initialize(Collection);
 }
@@ -42,6 +47,16 @@ void UNoiseManagerSubSystem::LoadLayers()
 	InitializeNoise(NS.LapisOreNoise, LapisOreParams, TEXT("LapisOre"), FastNoiseLite::NoiseType_Perlin, 0.055f, 3.0f, 0.5f, 2.0f);
 	InitializeNoise(NS.DiamondOreNoise, DiamondOreParams, TEXT("DiamondOre"), FastNoiseLite::NoiseType_Perlin, 0.05f, 3.0f, 0.5f, 2.0f);
 	InitializeNoise(NS.EmeraldOreNoise, EmeraldOreParams, TEXT("EmeraldOre"), FastNoiseLite::NoiseType_Perlin, 0.045f, 3.0f, 0.5f, 2.0f);
+	
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.CoalOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.DiamondOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.CopperOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.EmeraldOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.GoldOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.IronOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.LapisOre);
+	InitializeOreNoiseAdditionParams(OresAdditionalParams.RedstoneOre);
+	
 }
 
 void UNoiseManagerSubSystem::SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params,	FastNoiseLite::NoiseType noiseType)
@@ -64,24 +79,43 @@ void UNoiseManagerSubSystem::InitializeNoise(FastNoiseLite& Noise, FNoisesParams
 	Params.Lacunarity = DefaultLacunarity;
 	
 	FastNoises.Add(&Noise, FText::FromName(Params.rowName));
-	LoadNoiseParams(Noise, Params);
+	LoadNoiseParamsFromTable(Noise, Params);
 	SetNoiseParams(Noise, Params, NoiseType);
 }
 
-void UNoiseManagerSubSystem::LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params)
+void UNoiseManagerSubSystem::InitializeOreNoiseAdditionParams(FOreAdditionalParam& Ore)
 {
-	if (!PerlinNoiseTable)
+	if (OreGenerationTablePath)
+	{
+		auto RowOreNoise = OreGenerationTablePath->FindRow<FOreGenerationRow>(Ore.NoisesParams->rowName,"name");	
+		OreGenerationParams.MaxZ = RowOreNoise->MaxZ;
+		OreGenerationParams.MinZ = RowOreNoise->MinZ;
+		OreGenerationParams.OreBlock = RowOreNoise->OreBlock;
+		OreGenerationParams.Threshold = RowOreNoise->Threshold;
+	}	
+}
+
+void UNoiseManagerSubSystem::LoadNoiseParamsFromTable(FastNoiseLite& noise, FNoisesParams& params)
+{
+	if (!OreGenerationTablePath || !TerrainNoiseTablePath)
 	{
 		return;
 	}
-	
-	auto Row = PerlinNoiseTable->FindRow<FPerlinNoiseBiom>(params.rowName,"name");	
-	if (Row)
+	auto RowTerrainNoise = TerrainNoiseTablePath->FindRow<FPerlinNoiseRow>(params.rowName,"name");	
+	if (RowTerrainNoise)
 	{
-		params.Scale = Row->Scale;
-		params.Octaves = Row->Octaves;
-		params.Persistence = Row->Persistence;
-		params.Lacunarity = Row->Lacunarity;
+		params.Scale = RowTerrainNoise->Scale;
+		params.Octaves = RowTerrainNoise->Octaves;
+		params.Persistence = RowTerrainNoise->Persistence;
+		params.Lacunarity = RowTerrainNoise->Lacunarity;
+	}
+	auto RowOreNoise = OreGenerationTablePath->FindRow<FOreGenerationRow>(params.rowName,"name");	
+	if (RowOreNoise)
+	{
+		params.Scale = RowOreNoise->Scale;
+		params.Octaves = RowOreNoise->Octaves;
+		params.Persistence = RowOreNoise->Persistence;
+		params.Lacunarity = RowOreNoise->Lacunarity;
 	}
 }
 
@@ -90,7 +124,7 @@ TMap<FastNoiseLite*, FText>& UNoiseManagerSubSystem::GetNoisesMap()
 	return FastNoises;
 }
 
-FFastNoises& UNoiseManagerSubSystem::GetNoises()
+FFastNoisesTerrain& UNoiseManagerSubSystem::GetNoises()
 {
 	return NS;
 }

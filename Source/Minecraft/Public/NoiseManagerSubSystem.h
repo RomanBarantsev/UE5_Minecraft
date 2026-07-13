@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GreedyMeshing.h"
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
 #include "Minecraft/FastNoiseLite.h"
@@ -26,7 +25,34 @@ public:
 	FName rowName;
 };
 
-struct FNoises
+USTRUCT()
+struct FOreAdditionalParam 
+{
+	GENERATED_BODY()
+	FNoisesParams* NoisesParams = nullptr;
+	BlockType OreBlock = BlockType::CoalOre;
+	int32 MinZ = 0;
+	int32 MaxZ = CHUNK_Z_SIZE - 1;
+	float Threshold = 0.5f;
+};
+
+
+USTRUCT()
+struct FFastNoisesParams
+{
+	GENERATED_BODY()
+public:	 
+	FOreAdditionalParam CoalOre;
+	FOreAdditionalParam CopperOre;
+	FOreAdditionalParam IronOre;
+	FOreAdditionalParam GoldOre;
+	FOreAdditionalParam RedstoneOre;
+	FOreAdditionalParam LapisOre;
+	FOreAdditionalParam DiamondOre;
+	FOreAdditionalParam EmeraldOre;
+};
+
+struct FNoisesRunTime
 {
 	float CavesRoom;
 	float CavesTunnel;
@@ -36,6 +62,7 @@ struct FNoises
 	float Erosion;
 	float Humidity;
 	float Temperature;
+	
 	float CoalOre;
 	float CopperOre;
 	float IronOre;
@@ -47,7 +74,7 @@ struct FNoises
 };
 
 USTRUCT()
-struct FPerlinNoiseBiom : public FTableRowBase
+struct FPerlinNoiseRow : public FTableRowBase
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Perlin Noise")
@@ -61,7 +88,7 @@ struct FPerlinNoiseBiom : public FTableRowBase
 };
 
 USTRUCT(BlueprintType)
-struct FOreGenerationRow : public FTableRowBase
+struct FOreGenerationRow : public FPerlinNoiseRow
 {
 	GENERATED_BODY()
 	
@@ -73,21 +100,12 @@ struct FOreGenerationRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
 	int32 MaxZ = CHUNK_Z_SIZE - 1;
-
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	float Scale = 0.05f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	int32 Octaves = 3;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	float Persistence = 0.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ore")
-	float Lacunarity = 2.0f;
+	float Threshold = 0.5f;
 };
 
-struct FFastNoises
+struct FFastNoisesTerrain
 {
 	FastNoiseLite CavesRoomNoise;
 	FastNoiseLite CavesTunnelNoise;
@@ -108,6 +126,21 @@ struct FFastNoises
 	FastNoiseLite EmeraldOreNoise;
 };
 
+
+// TODO need to rework
+/*struct FNoiseRegistration
+{
+	FastNoiseLite* Noise = nullptr;
+	FNoisesParams* Params = nullptr;
+	FName RowName;
+	FastNoiseLite::NoiseType NoiseType = FastNoiseLite::NoiseType_Perlin;
+};
+
+struct FNoiseOreRegistaion : public FNoiseRegistration
+{	
+	FOreGenerationParam* OreParams = nullptr;
+};*/
+
 UCLASS()
 class MINECRAFT_API UNoiseManagerSubSystem : public UGameInstanceSubsystem
 {
@@ -115,7 +148,8 @@ class MINECRAFT_API UNoiseManagerSubSystem : public UGameInstanceSubsystem
 private:
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	//default value
-	FFastNoises NS;
+	FFastNoisesTerrain NS;
+	FFastNoisesParams OresAdditionalParams;
 	FNoisesParams CavesRoomParams;
 	FNoisesParams CavesTunnelParams;
 	FNoisesParams ContinentalnessParams;
@@ -135,16 +169,21 @@ private:
 	FNoisesParams EmeraldOreParams;
 	
 	TMap<FastNoiseLite*,FText> FastNoises; //for UI	
+	//TMap<FastNoiseLite*,FText> FastNoises; //for UI
+	FOreAdditionalParam OreGenerationParams;
 	
 	UPROPERTY()
-	UDataTable* PerlinNoiseTable;
+	UDataTable* TerrainNoiseTablePath;
+	UPROPERTY()
+	UDataTable* OreGenerationTablePath;
 	
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;	
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	void InitializeNoise(FastNoiseLite& Noise, FNoisesParams& Params, FName RowName, FastNoiseLite::NoiseType NoiseType, float DefaultScale = 0.05f, float DefaultOctaves = 3.0f, float DefaultPersistence = 0.5f, float DefaultLacunarity = 2.0f);
+	void InitializeOreNoiseAdditionParams(FOreAdditionalParam& CoalOre);
 	void LoadLayers();
-	void LoadNoiseParams(FastNoiseLite& noise, FNoisesParams& params);
+	void LoadNoiseParamsFromTable(FastNoiseLite& noise, FNoisesParams& params);
 public:
 	TMap<FastNoiseLite*,FText>& GetNoisesMap();
-	FFastNoises& GetNoises();
+	FFastNoisesTerrain& GetNoises();
 };
