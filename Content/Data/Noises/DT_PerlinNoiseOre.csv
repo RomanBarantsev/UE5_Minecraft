@@ -1,0 +1,9 @@
+Name,Scale,Octaves,Persistence,Lacunarity,OreBlock,MinZ,MaxZ,Threshold
+CoalOre,0.085,3.0,0.5,2.0,CoalOre,0,128,0.42
+CopperOre,0.075,3.0,0.5,2.0,CopperOre,0,96,0.48
+IronOre,0.07,3.0,0.5,2.0,IronOre,0,64,0.50
+GoldOre,0.065,3.0,0.5,2.0,GoldOre,0,32,0.62
+RedstoneOre,0.06,3.0,0.5,2.0,RedstoneOre,0,16,0.55
+LapisOre,0.055,3.0,0.5,2.0,LapisOre,0,32,0.66
+DiamondOre,0.05,3.0,0.5,2.0,DiamondOre,0,16,0.72
+EmeraldOre,0.045,3.0,0.5,2.0,EmeraldOre,4,32,0.78
