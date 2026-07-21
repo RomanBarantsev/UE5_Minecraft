@@ -248,13 +248,12 @@ void FGreedyMeshing::AddQuad(EFace Face, int x, int y, int z, int w, int h, Bloc
 		Normals.Add(Config.Normal);
 	}
 
-	const float AtlasSize = 8.0f;
-	const float TileSize = 1.0f / AtlasSize;
-	float TileIndex = GetTileIndex(Type);
-	int TileX = FMath::FloorToInt(TileIndex) % static_cast<int>(AtlasSize);
-	int TileY = FMath::FloorToInt(TileIndex) / static_cast<int>(AtlasSize);
-	float BaseU = TileX * TileSize;
-	float BaseV = TileY * TileSize;
+	
+	const int32 TileIndex = static_cast<int32>(GetTileIndex(Type));
+	const int32 TileX = TileIndex % AtlasTilesPerRow;
+	const int32 TileY = TileIndex / AtlasTilesPerRow;
+	const float BaseU = TileX * TileSize;
+	const float BaseV = TileY * TileSize;
 
 	switch (Face)
 	{

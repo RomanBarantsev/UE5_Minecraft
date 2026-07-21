@@ -28,6 +28,9 @@ class FGreedyMeshing
 public:
 	FGreedyMeshing();
 private:
+	static constexpr int32 AtlasTilesPerRow = 8;
+	static constexpr int32 AtlasTileCount = AtlasTilesPerRow * AtlasTilesPerRow;
+	static constexpr float TileSize = 1.0f / AtlasTilesPerRow;
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
