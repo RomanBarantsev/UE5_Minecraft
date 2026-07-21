@@ -48,14 +48,14 @@ void UNoiseManagerSubSystem::LoadLayers()
 	InitializeNoise(NS.DiamondOreNoise, DiamondOreParams, TEXT("DiamondOre"), FastNoiseLite::NoiseType_Perlin, 0.05f, 3.0f, 0.5f, 2.0f);
 	InitializeNoise(NS.EmeraldOreNoise, EmeraldOreParams, TEXT("EmeraldOre"), FastNoiseLite::NoiseType_Perlin, 0.045f, 3.0f, 0.5f, 2.0f);
 	
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.CoalOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.DiamondOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.CopperOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.EmeraldOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.GoldOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.IronOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.LapisOre);
-	InitializeOreNoiseAdditionParams(OresAdditionalParams.RedstoneOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.CoalOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.DiamondOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.CopperOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.EmeraldOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.GoldOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.IronOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.LapisOre);
+	InitializeOreNoiseAdditionParams(OresAddParamList.RedstoneOre);
 	
 }
 
@@ -83,15 +83,16 @@ void UNoiseManagerSubSystem::InitializeNoise(FastNoiseLite& Noise, FNoisesParams
 	SetNoiseParams(Noise, Params, NoiseType);
 }
 
-void UNoiseManagerSubSystem::InitializeOreNoiseAdditionParams(FOreAdditionalParam& Ore)
+void UNoiseManagerSubSystem::InitializeOreNoiseAdditionParams(FOreAdditionalParameters& Ore)
 {
 	if (OreGenerationTablePath)
 	{
+		
 		auto RowOreNoise = OreGenerationTablePath->FindRow<FOreGenerationRow>(Ore.NoisesParams->rowName,"name");	
-		OreGenerationParams.MaxZ = RowOreNoise->MaxZ;
-		OreGenerationParams.MinZ = RowOreNoise->MinZ;
-		OreGenerationParams.OreBlock = RowOreNoise->OreBlock;
-		OreGenerationParams.Threshold = RowOreNoise->Threshold;
+		Ore.MaxZ = RowOreNoise->MaxZ;
+		Ore.MinZ = RowOreNoise->MinZ;
+		Ore.OreBlock = RowOreNoise->OreBlock;
+		Ore.Threshold = RowOreNoise->Threshold;
 	}	
 }
 

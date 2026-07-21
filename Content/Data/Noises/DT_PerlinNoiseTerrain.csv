@@ -1,0 +1,9 @@
+Name,Scale,Octaves,Persistence,Lacunarity
+CavesRoom,0.032,3.0,0.58,2.0
+CavesTunnel,0.075,4.0,0.52,2.15
+Continentalness,0.0035,4.0,0.50,2.0
+PeaksValleys,0.012,4.0,0.55,2.1
+Bedrock,0.38,1.0,0.50,2.0
+Erosion,0.006,3.0,0.45,2.0
+Humidity,0.0045,2.0,0.50,2.0
+Temperature,0.004,2.0,0.50,2.0

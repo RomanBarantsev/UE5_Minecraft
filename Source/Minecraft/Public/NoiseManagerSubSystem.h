@@ -26,7 +26,7 @@ public:
 };
 
 USTRUCT()
-struct FOreAdditionalParam 
+struct FOreAdditionalParameters 
 {
 	GENERATED_BODY()
 	FNoisesParams* NoisesParams = nullptr;
@@ -38,18 +38,18 @@ struct FOreAdditionalParam
 
 
 USTRUCT()
-struct FFastNoisesParams
+struct FOresAddParamsList 
 {
 	GENERATED_BODY()
 public:	 
-	FOreAdditionalParam CoalOre;
-	FOreAdditionalParam CopperOre;
-	FOreAdditionalParam IronOre;
-	FOreAdditionalParam GoldOre;
-	FOreAdditionalParam RedstoneOre;
-	FOreAdditionalParam LapisOre;
-	FOreAdditionalParam DiamondOre;
-	FOreAdditionalParam EmeraldOre;
+	FOreAdditionalParameters CoalOre;
+	FOreAdditionalParameters CopperOre;
+	FOreAdditionalParameters IronOre;
+	FOreAdditionalParameters GoldOre;
+	FOreAdditionalParameters RedstoneOre;
+	FOreAdditionalParameters LapisOre;
+	FOreAdditionalParameters DiamondOre;
+	FOreAdditionalParameters EmeraldOre;
 };
 
 struct FNoisesRunTime
@@ -149,7 +149,7 @@ private:
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	//default value
 	FFastNoisesTerrain NS;
-	FFastNoisesParams OresAdditionalParams;
+	FOresAddParamsList OresAddParamList;
 	FNoisesParams CavesRoomParams;
 	FNoisesParams CavesTunnelParams;
 	FNoisesParams ContinentalnessParams;
@@ -169,8 +169,6 @@ private:
 	FNoisesParams EmeraldOreParams;
 	
 	TMap<FastNoiseLite*,FText> FastNoises; //for UI	
-	//TMap<FastNoiseLite*,FText> FastNoises; //for UI
-	FOreAdditionalParam OreGenerationParams;
 	
 	UPROPERTY()
 	UDataTable* TerrainNoiseTablePath;
@@ -180,7 +178,7 @@ private:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	void SetNoiseParams(FastNoiseLite& Noise, FNoisesParams params, FastNoiseLite::NoiseType noiseType);
 	void InitializeNoise(FastNoiseLite& Noise, FNoisesParams& Params, FName RowName, FastNoiseLite::NoiseType NoiseType, float DefaultScale = 0.05f, float DefaultOctaves = 3.0f, float DefaultPersistence = 0.5f, float DefaultLacunarity = 2.0f);
-	void InitializeOreNoiseAdditionParams(FOreAdditionalParam& CoalOre);
+	void InitializeOreNoiseAdditionParams(FOreAdditionalParameters& CoalOre);
 	void LoadLayers();
 	void LoadNoiseParamsFromTable(FastNoiseLite& noise, FNoisesParams& params);
 public:
