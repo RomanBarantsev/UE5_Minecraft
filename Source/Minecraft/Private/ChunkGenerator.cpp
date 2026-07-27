@@ -30,7 +30,8 @@ void AChunkGenerator::BeginPlay()
 	NoiseManager = GetGameInstance()->GetSubsystem<UNoiseManagerSubSystem>();
 	if (!NoiseManager)
 		UKismetSystemLibrary::QuitGame(GetWorld(), UGameplayStatics::GetPlayerController(GetWorld(),0), EQuitPreference::Quit, false);	
-	FastNoises = NoiseManager->GetNoises();
+	FastNoises = NoiseManager->GetFastNoises();
+	OresAddParameters = NoiseManager->GetOreAdditionalParameters();
 	LoadAllBioms();
 	InitializeBiomeMap();
 
@@ -181,35 +182,35 @@ void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 	double BlocksMs = 0.0;
 	double SurfaceMs = 0.0;
 
-	for (int x = 0; x < CHUNK_X_SIZE; x++)
+	for (int ChunkX = 0; ChunkX < CHUNK_X_SIZE; ChunkX++)
 	{
-		for (int y = 0; y < CHUNK_Y_SIZE; y++)
+		for (int ChunkY = 0; ChunkY < CHUNK_Y_SIZE; ChunkY++)
 		{
-			const int WorldX = Data.ChunkCoord.x * CHUNK_X_SIZE + x;
-			const int WorldY = Data.ChunkCoord.y * CHUNK_Y_SIZE + y;
-			const float Fx = static_cast<float>(WorldX);
-			const float Fy = static_cast<float>(WorldY);
+			const int WorldX = Data.ChunkCoord.x * CHUNK_X_SIZE + ChunkX;
+			const int WorldY = Data.ChunkCoord.y * CHUNK_Y_SIZE + ChunkY;
+			const float WorldFloatX = static_cast<float>(WorldX);
+			const float WorldFloatY = static_cast<float>(WorldY);
 			FNoisesRunTime Noises{};
 
 			const double HeightStart = FPlatformTime::Seconds();
-			Noises.PeaksValleys = FastNoises.PeaksValleysNoise.GetNoise(Fx, Fy);
-			Noises.Continentalness = FastNoises.ContinentalnessNoise.GetNoise(Fx, Fy);
-			Noises.Erosion = FastNoises.ErosionNoise.GetNoise(Fx, Fy);
-			Noises.Humidity = FastNoises.HumidityNoise.GetNoise(Fx, Fy);
-			Noises.Temperature = FastNoises.TemperatureNoise.GetNoise(Fx, Fy);
+			Noises.PeaksValleys = FastNoises.PeaksValleysNoise.GetNoise(WorldFloatX, WorldFloatY);
+			Noises.Continentalness = FastNoises.ContinentalnessNoise.GetNoise(WorldFloatX, WorldFloatY);
+			Noises.Erosion = FastNoises.ErosionNoise.GetNoise(WorldFloatX, WorldFloatY);
+			Noises.Humidity = FastNoises.HumidityNoise.GetNoise(WorldFloatX, WorldFloatY);
+			Noises.Temperature = FastNoises.TemperatureNoise.GetNoise(WorldFloatX, WorldFloatY);
 
 			const int Height = CalculateHeight(Noises);
-			Data.SetSurfaceHeight(x, y, Height);
+			Data.SetSurfaceHeight(ChunkX, ChunkY, Height);
 			HeightMs += (FPlatformTime::Seconds() - HeightStart) * 1000.0;
 
 			const double BlocksStart = FPlatformTime::Seconds();
-			GenerateCaveBlock(Data, x, y, Height, Fx, Fy, bGenerateBiomeBlocks);
+			GenerateCavesAndOreBlock(Data, ChunkX, ChunkY, Height, WorldFloatX, WorldFloatY, bGenerateBiomeBlocks);
 			BlocksMs += (FPlatformTime::Seconds() - BlocksStart) * 1000.0;
 
 			if (bGenerateBiomeBlocks)
 			{
 				const double SurfaceStart = FPlatformTime::Seconds();
-				GenerateSurfaceLayer(Height, Noises, Data, x, y);
+				GenerateSurfaceLayer(Height, Noises, Data, ChunkX, ChunkY);
 				SurfaceMs += (FPlatformTime::Seconds() - SurfaceStart) * 1000.0;
 			}
 		}
@@ -223,40 +224,114 @@ void AChunkGenerator::GenerateChunkData(FChunkBuildData& Data)
 		BlocksMs, SurfaceMs, TotalMs);
 }
 
-void AChunkGenerator::GenerateCaveBlock(FChunkBuildData& Data,int x,int y,int SurfaceHeight,float Fx,float Fy,bool bGenerateBiomeBlocks)
+void AChunkGenerator::GenerateCavesAndOreBlock(FChunkBuildData& Data,int ChunkX,int ChunkY,int SurfaceHeight,float WorldFloatX,float WorldFloatY,bool bGenerateBiomeBlocks)
 {
-	const float BedrockNoise = bGenerateBiomeBlocks ? FastNoises.BedrockNoise.GetNoise(Fx, Fy) : 0.0f;
+	const float BedrockNoise = bGenerateBiomeBlocks ? FastNoises.BedrockNoise.GetNoise(WorldFloatX, WorldFloatY) : 0.0f;
 	const int BedrockTop = BEDROCK_BASE + static_cast<int>(((BedrockNoise + 1.0f) * 0.5f * BEDROCK_HEIGHT));
 
-	for (int z = 0; z < CHUNK_Z_SIZE; ++z)
+	for (int ChunkZ = 0; ChunkZ < CHUNK_Z_SIZE; ++ChunkZ)
 	{
-		if (z > SurfaceHeight)
+		if (ChunkZ > SurfaceHeight)
 		{
-			Data.SetBlock(x, y, z, BlockType::Air);
+			Data.SetBlock(ChunkX, ChunkY, ChunkZ, BlockType::Air);
 			continue;
 		}
 
-		if (!bGenerateBiomeBlocks || z == SurfaceHeight)
+		if (!bGenerateBiomeBlocks || ChunkZ == SurfaceHeight)
 		{
-			Data.SetBlock(x, y, z, BlockType::Stone);
+			Data.SetBlock(ChunkX, ChunkY, ChunkZ, BlockType::Stone);
 			continue;
 		}
 
-		if (z < BedrockTop || z == 0)
+		if (ChunkZ < BedrockTop || ChunkZ == 0)
 		{
-			Data.SetBlock(x, y, z, BlockType::Cobblestone);
+			Data.SetBlock(ChunkX, ChunkY, ChunkZ, BlockType::Cobblestone);
 			continue;
 		}
 
-		const float Room = FastNoises.CavesRoomNoise.GetNoise(Fx, Fy, static_cast<float>(z));
-		const float Tunnel = FastNoises.CavesTunnelNoise.GetNoise(Fx, Fy, static_cast<float>(z));
-		const float Mask = GetHeightMask(z, 1, SurfaceHeight);
+		const float Room = FastNoises.CavesRoomNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+		const float Tunnel = FastNoises.CavesTunnelNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+		const float Mask = GetHeightMask(ChunkZ, 1, SurfaceHeight);
 		float Density =
 			Tunnel * 1.2f + // tunnels are more important
 			Room * 0.8f; // rooms are not so frequently
 		Density *= Mask;
-
-		Data.SetBlock(x, y, z, Density > 0.25f ? BlockType::Air : BlockType::Stone);
+		auto CurrentBlock = Density > 0.25f ? BlockType::Air : BlockType::Stone;		
+		// ORES LOGIC
+		if (CurrentBlock==BlockType::Stone)
+		{
+			//get noises
+			const float Coal = FastNoises.CoalOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Copper = FastNoises.CopperOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Iron = FastNoises.IronOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Gold = FastNoises.GoldOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Redstone = FastNoises.RedstoneOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Lapis = FastNoises.LapisOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Diamond = FastNoises.DiamondOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			const float Emerald = FastNoises.EmeraldOreNoise.GetNoise(WorldFloatX, WorldFloatY, static_cast<float>(ChunkZ));
+			if (OresAddParameters.CoalOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.CoalOre.MaxZ)
+			{
+				if (Coal>OresAddParameters.CoalOre.Threshold)
+				{
+					CurrentBlock=BlockType::CoalOre;
+				}
+			}
+			if (OresAddParameters.CopperOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.CopperOre.MaxZ)
+			{
+				if (Copper>OresAddParameters.CopperOre.Threshold)
+				{
+					CurrentBlock=BlockType::CopperOre;
+				}
+			}
+			if (OresAddParameters.IronOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.IronOre.MaxZ)
+			{
+				if (Iron>OresAddParameters.IronOre.Threshold)
+				{
+					CurrentBlock=BlockType::IronOre;
+				}
+			}
+			if (OresAddParameters.GoldOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.GoldOre.MaxZ)
+			{
+				if (Gold>OresAddParameters.GoldOre.Threshold)
+				{
+					CurrentBlock=BlockType::GoldOre;
+				}
+			}
+			if (OresAddParameters.RedstoneOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.RedstoneOre.MaxZ)
+			{
+				if (Redstone>OresAddParameters.RedstoneOre.Threshold)
+				{
+					CurrentBlock=BlockType::RedstoneOre;
+				}
+			}
+			if (OresAddParameters.LapisOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.LapisOre.MaxZ)
+			{
+				if (Lapis>OresAddParameters.LapisOre.Threshold)
+				{
+					CurrentBlock=BlockType::LapisOre;
+				}
+			}
+			if (OresAddParameters.DiamondOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.DiamondOre.MaxZ)
+			{
+				if (Diamond>OresAddParameters.DiamondOre.Threshold)
+				{
+					CurrentBlock=BlockType::DiamondOre;
+				}
+			}
+			if (OresAddParameters.EmeraldOre.MinZ <= ChunkZ && ChunkZ <= OresAddParameters.EmeraldOre.MaxZ)
+			{
+				if (Emerald>OresAddParameters.EmeraldOre.Threshold)
+				{
+					CurrentBlock=BlockType::EmeraldOre;
+				}
+			}
+			else
+				Data.SetBlock(ChunkX, ChunkY, ChunkZ,CurrentBlock);
+		}
+		else
+		{
+			Data.SetBlock(ChunkX, ChunkY, ChunkZ,CurrentBlock);
+		}
 	}
 }
 
@@ -298,5 +373,17 @@ void AChunkGenerator::GenerateSurfaceLayer(int z, FNoisesRunTime& noises,FChunkB
 		}
 		z-=DynamicThickness;
 	}	
+}
+
+void AChunkGenerator::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UChunkManagerSubsystem* Subsystem = World->GetSubsystem<UChunkManagerSubsystem>())
+		{
+			Subsystem->SetChunkGenerator(nullptr);
+		}
+	}
+	Super::EndPlay(EndPlayReason);
 }
 

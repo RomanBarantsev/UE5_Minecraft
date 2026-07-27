@@ -105,7 +105,7 @@ struct FOreGenerationRow : public FPerlinNoiseRow
 	float Threshold = 0.5f;
 };
 
-struct FFastNoisesTerrain
+struct FFastNoises
 {
 	FastNoiseLite CavesRoomNoise;
 	FastNoiseLite CavesTunnelNoise;
@@ -126,6 +126,10 @@ struct FFastNoisesTerrain
 	FastNoiseLite EmeraldOreNoise;
 };
 
+struct FOreAdditionalNoises
+{
+	
+};
 
 // TODO need to rework
 /*struct FNoiseRegistration
@@ -148,7 +152,7 @@ class MINECRAFT_API UNoiseManagerSubSystem : public UGameInstanceSubsystem
 private:
 	UPROPERTY(EditAnywhere)
 	int Seed=1343;	//default value
-	FFastNoisesTerrain NS;
+	FFastNoises NS;
 	FOresAddParamsList OresAddParamList;
 	FNoisesParams CavesRoomParams;
 	FNoisesParams CavesTunnelParams;
@@ -183,5 +187,6 @@ private:
 	void LoadNoiseParamsFromTable(FastNoiseLite& noise, FNoisesParams& params);
 public:
 	TMap<FastNoiseLite*,FText>& GetNoisesMap();
-	FFastNoisesTerrain& GetNoises();
+	FFastNoises& GetFastNoises();
+	FOresAddParamsList& GetOreAdditionalParameters();
 };

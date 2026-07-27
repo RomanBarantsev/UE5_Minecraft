@@ -40,14 +40,21 @@ void UNoiseManagerSubSystem::LoadLayers()
 	InitializeNoise(NS.TemperatureNoise, TemperatureParams, TEXT("Temperature"), FastNoiseLite::NoiseType_Perlin);
 	
 	InitializeNoise(NS.CoalOreNoise, CoalOreParams, TEXT("CoalOre"), FastNoiseLite::NoiseType_Perlin, 0.085f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.CoalOre.NoisesParams = &CoalOreParams;
 	InitializeNoise(NS.CopperOreNoise, CopperOreParams, TEXT("CopperOre"), FastNoiseLite::NoiseType_Perlin, 0.075f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.CopperOre.NoisesParams = &CopperOreParams;
 	InitializeNoise(NS.IronOreNoise, IronOreParams, TEXT("IronOre"), FastNoiseLite::NoiseType_Perlin, 0.07f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.IronOre.NoisesParams = &IronOreParams;
 	InitializeNoise(NS.GoldOreNoise, GoldOreParams, TEXT("GoldOre"), FastNoiseLite::NoiseType_Perlin, 0.065f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.GoldOre.NoisesParams = &GoldOreParams;
 	InitializeNoise(NS.RedstoneOreNoise, RedstoneOreParams, TEXT("RedstoneOre"), FastNoiseLite::NoiseType_Perlin, 0.06f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.RedstoneOre.NoisesParams = &RedstoneOreParams;
 	InitializeNoise(NS.LapisOreNoise, LapisOreParams, TEXT("LapisOre"), FastNoiseLite::NoiseType_Perlin, 0.055f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.LapisOre.NoisesParams = &LapisOreParams;
 	InitializeNoise(NS.DiamondOreNoise, DiamondOreParams, TEXT("DiamondOre"), FastNoiseLite::NoiseType_Perlin, 0.05f, 3.0f, 0.5f, 2.0f);
+	OresAddParamList.DiamondOre.NoisesParams = &DiamondOreParams;
 	InitializeNoise(NS.EmeraldOreNoise, EmeraldOreParams, TEXT("EmeraldOre"), FastNoiseLite::NoiseType_Perlin, 0.045f, 3.0f, 0.5f, 2.0f);
-	
+	OresAddParamList.EmeraldOre.NoisesParams = &EmeraldOreParams;
 	InitializeOreNoiseAdditionParams(OresAddParamList.CoalOre);
 	InitializeOreNoiseAdditionParams(OresAddParamList.DiamondOre);
 	InitializeOreNoiseAdditionParams(OresAddParamList.CopperOre);
@@ -125,7 +132,12 @@ TMap<FastNoiseLite*, FText>& UNoiseManagerSubSystem::GetNoisesMap()
 	return FastNoises;
 }
 
-FFastNoisesTerrain& UNoiseManagerSubSystem::GetNoises()
+FFastNoises& UNoiseManagerSubSystem::GetFastNoises()
 {
 	return NS;
+}
+
+FOresAddParamsList& UNoiseManagerSubSystem::GetOreAdditionalParameters()
+{
+	return OresAddParamList;
 }
