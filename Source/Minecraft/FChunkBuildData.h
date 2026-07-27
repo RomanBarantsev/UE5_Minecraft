@@ -28,12 +28,12 @@ FORCEINLINE uint32 GetTypeHash(const FChunkCoord& Key)
 UENUM()
 enum BlockType : uint8
 {
-	Empty = 0,
-	Air = 5,
-	Grass = 9,
-	Dirt = 3,
+	Grass = 1,
+	Empty = 2,
+	Air = 3,
+	Dirt = 4,
 	Stone = 2,
-	Snow = 1,
+	Snow = 9,
 	Leaves = 8,
 	Sand = 7,
 	Gravel = 6,
@@ -43,17 +43,15 @@ enum BlockType : uint8
 	Water = 10,
 	Lava = 13,
 	Bedrock = 14,
-	IronBlock = 15,
-	GoldBlock = 16,	
-	Count = 17,
-	CoalOre = 18,
-	CopperOre = 19,
+	CoalOre = 16,
+	CopperOre = 17,
 	IronOre = 20,
-	GoldOre = 21,
+	GoldOre = 19,
 	RedstoneOre = 22,
-	LapisOre = 23,
-	DiamondOre = 24,
-	EmeraldOre = 25
+	LapisOre = 18,
+	DiamondOre = 20,
+	EmeraldOre = 21,
+	Count = 64,
 };
 
 constexpr int BLOCK_SIZE = 256;
